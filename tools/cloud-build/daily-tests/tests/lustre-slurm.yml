@@ -39,4 +39,4 @@ custom_vars:
   partitions:
   - centos
   - rocky
-  # - ubuntu
+  - ubuntu
