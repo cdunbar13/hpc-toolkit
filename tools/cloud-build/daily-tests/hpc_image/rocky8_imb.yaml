@@ -54,4 +54,4 @@ steps:
     git clone https://cloudhpc.googlesource.com/hpc-toolkit-blueprints
 
     cd tools/cloud-build/daily-tests/hpc_image
-    python3 image_tester.py -p cloud-hpc-image-public -f hpc-rocky-8 -z us-central1-a -n 3 -r /workspace/hpc-toolkit-blueprints/intel-mpi-benchmarks/ramble.yaml
+    python3 image_tester.py -p cloud-hpc-image-public -f hpc-rocky-linux-8 -z us-central1-a -n 3 -r /workspace/hpc-toolkit-blueprints/intel-mpi-benchmarks/ramble.yaml

@@ -93,7 +93,7 @@ def build_ghpc(branch: str = "develop") -> None:
         return
     if os.path.exists(GHPC_DIR):
         shutil.rmtree(GHPC_DIR)
-    install_go()
+    # install_go()
     print("Cloning HPC Toolkit")
     cmd = f"git clone https://github.com/GoogleCloudPlatform/hpc-toolkit.git {GHPC_DIR}"
     run_command(cmd, "Error cloning HPC Toolkit repo")
