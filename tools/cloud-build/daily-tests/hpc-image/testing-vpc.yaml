@@ -1,0 +1,217 @@
+# Copyright 2024 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+blueprint_name: hpc-image-testing-one-time  # the name in GCP
+
+vars:
+  project_id: # Project ID
+  deployment_name: hpc-image-one-time
+  region: us-central1
+
+deployment_groups:
+- group: primary
+  modules:
+  - id: hpc-image-network
+    source: modules/network/vpc
+    settings:
+      network_name: hpc-image-testing-net
+
+  - id: bq-dataset
+    source: community/modules/database/bigquery-dataset
+    settings:
+      dataset_id: hpc_image_testing_zep
+
+  - id: experiments-table
+    source: community/modules/database/bigquery-table
+    use: [bq-dataset]
+    settings:
+      table_id: experiments
+      table_schema:
+        '
+        [
+          {
+            "name": "id",
+            "mode": "NULLABLE",
+            "type": "STRING",
+            "description": null,
+            "fields": []
+          },
+          {
+            "name": "data",
+            "mode": "NULLABLE",
+            "type": "JSON",
+            "description": null,
+            "fields": []
+          },
+          {
+            "name": "bulk_hash",
+            "mode": "NULLABLE",
+            "type": "STRING",
+            "description": null,
+            "fields": []
+          },
+          {
+            "name": "application_name",
+            "mode": "NULLABLE",
+            "type": "STRING",
+            "description": null,
+            "fields": []
+          },
+          {
+            "name": "name",
+            "mode": "NULLABLE",
+            "type": "STRING",
+            "description": null,
+            "fields": []
+          },
+          {
+            "name": "foms",
+            "mode": "NULLABLE",
+            "type": "JSON",
+            "description": null,
+            "fields": []
+          },
+          {
+            "name": "processes_per_node",
+            "mode": "NULLABLE",
+            "type": "INTEGER",
+            "description": null,
+            "fields": []
+          },
+          {
+            "name": "n_nodes",
+            "mode": "NULLABLE",
+            "type": "INTEGER",
+            "description": null,
+            "fields": []
+          },
+          {
+            "name": "n_ranks",
+            "mode": "NULLABLE",
+            "type": "INTEGER",
+            "description": null,
+            "fields": []
+          },
+          {
+            "name": "n_threads",
+            "mode": "NULLABLE",
+            "type": "INTEGER",
+            "description": null,
+            "fields": []
+          },
+          {
+            "name": "workload_name",
+            "mode": "NULLABLE",
+            "type": "STRING",
+            "description": null,
+            "fields": []
+          },
+          {
+            "name": "timestamp",
+            "mode": "NULLABLE",
+            "type": "DATETIME",
+            "description": null,
+            "fields": []
+          },
+          {
+            "name": "workspace_name",
+            "mode": "NULLABLE",
+            "type": "STRING",
+            "description": null,
+            "fields": []
+          },
+          {
+            "name": "node_type",
+            "mode": "NULLABLE",
+            "type": "STRING",
+            "description": null,
+            "fields": []
+          },
+          {
+            "name": "workspace_hash",
+            "mode": "NULLABLE",
+            "type": "STRING",
+            "description": null,
+            "fields": []
+          }
+        ]
+        '
+
+  - id: foms-table
+    source: community/modules/database/bigquery-table
+    use: [bq-dataset]
+    settings:
+      table_id: foms
+      table_schema:
+        '
+        [
+          {
+            "name": "name",
+            "mode": "NULLABLE",
+            "type": "STRING",
+            "description": null,
+            "fields": []
+          },
+          {
+            "name": "value",
+            "mode": "NULLABLE",
+            "type": "STRING",
+            "description": null,
+            "fields": []
+          },
+          {
+            "name": "unit",
+            "mode": "NULLABLE",
+            "type": "STRING",
+            "description": null,
+            "fields": []
+          },
+          {
+            "name": "context",
+            "mode": "NULLABLE",
+            "type": "STRING",
+            "description": null,
+            "fields": []
+          },
+          {
+            "name": "experiment_id",
+            "mode": "NULLABLE",
+            "type": "STRING",
+            "description": null,
+            "fields": []
+          },
+          {
+            "name": "experiment_name",
+            "mode": "NULLABLE",
+            "type": "STRING",
+            "description": null,
+            "fields": []
+          },
+          {
+            "name": "origin",
+            "mode": "NULLABLE",
+            "type": "STRING",
+            "description": null,
+            "fields": []
+          },
+          {
+            "name": "origin_type",
+            "mode": "NULLABLE",
+            "type": "STRING",
+            "description": null,
+            "fields": []
+          }
+        ]
+        '

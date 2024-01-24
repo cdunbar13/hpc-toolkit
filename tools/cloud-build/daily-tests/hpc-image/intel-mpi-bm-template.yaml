@@ -1,0 +1,215 @@
+# Copyright 2024 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+blueprint_name: imb_template  # the name in GCP
+
+vars:
+  project_id: # Project ID
+  ramble_config_location: # ramble.yaml local absolute path
+  deployment_name: # the output directory
+  region: us-central1
+  zone: us-central1-c
+
+  # Settings for vm-instance
+  compute_machine_type:
+  num_instances: 8
+  disk_size_gb: 200
+  disk_type: 'pd-ssd'
+  bandwidth_tier: gvnic_enabled
+  placement_policy:
+    # vm_count: $(vars.num_instances)  # not set to avoid potential deadlock due to Terraform's max parallelism
+    collocation: "COLLOCATED"
+    max_distance: 1
+
+  # Settings for wait-for-startup
+  timeout: 7200
+
+deployment_groups:
+- group: primary
+  modules:
+  - id: network1
+    source: modules/network/pre-existing-vpc
+    settings:
+      network_name: hpc-image-testing-net
+      subnetwork_name: hpc-image-vpc-primary-subnet
+
+  - id: spack-setup
+    source: community/modules/scripts/spack-setup
+    settings:
+      install_dir: /shared/spack
+      spack_ref: 'v0.21.0'
+
+  - id: spack-execute
+    source: community/modules/scripts/spack-execute
+    use:
+    - spack-setup
+    settings:
+      commands: |
+        if [ "${HOSTNAME##*-}" == "0" ]; then
+          mkdir -p /shared/spack-packages/packages
+          if [ ! -f /shared/spack-packages/repo.yaml ]; then
+            echo -e "repo:\n  namespace: googleaux" > /shared/spack-packages/repo.yaml
+          fi
+          cp -r /shared/spack/var/spack/repos/builtin/packages/intel-mpi-benchmarks /shared/spack-packages/packages/intel-mpi-benchmarks
+          PKB_GITHUB_URL="https://github.com/GoogleCloudPlatform/PerfKitBenchmarker.git"
+          PKB_GITHUB_COMMIT="4576e0d89343941f1c1eda4a169862ba96e17f03"
+          git clone ${PKB_GITHUB_URL} perfkitbenchmarker
+          pushd perfkitbenchmarker
+          git checkout ${PKB_GITHUB_COMMIT}
+          cp 'perfkitbenchmarker/data/intelmpi.patch' '/shared/spack-packages/packages/intel-mpi-benchmarks/'
+          popd
+          pushd /shared/spack-packages/packages/intel-mpi-benchmarks
+          sed -i -e '0,/.*patch(.*/{//a \ \ \ \ # tail latency patch from perfkitbenchmarker\n\ \ \ \ patch("intelmpi.patch", when="+tail_latency", level=3)' -e '}' package.py
+          sed -i -e '0,/.*variant(.*/{//a \ \ \ \ # tail latency patch from perfkitbenchmarker\n\ \ \ \ variant("tail_latency", default=False, description="enable tail_latency patch")' -e '}' package.py
+          spack repo add --scope=site /shared/spack-packages
+          spack config --scope=site add "concretizer:targets:host_compatible:false"
+          spack config --scope=site add "config:build_stage:[/shared/spack_stage]"
+          spack config --scope=site add "packages:all:permissions:read:world"
+          # spack mirror add --scope=site gcs_source gs://internal-mirror/software
+          # spack mirror add --scope=site gcs_cache gs://spack-internal/v0.21.0
+          # spack buildcache keys --install --trust
+        fi
+
+  - id: ramble-setup
+    source: community/modules/scripts/ramble-setup
+    settings:
+      install_dir: /shared/ramble
+      ramble_ref: 'develop'
+
+  - id: ramble-execute
+    source: community/modules/scripts/ramble-execute
+    use:
+    - spack-setup
+    - ramble-setup
+    settings:
+      data_files:
+      - destination: /shared/ramble.yaml
+        source: $(vars.ramble_config_location)
+      - destination: /shared/execute_experiment.tpl
+        content: |
+          #!/bin/bash
+          cd {experiment_run_dir}
+          head -n {n_nodes} /shared/hostfile > hostfile
+          {command}
+      commands: |
+        cnt=0
+        MAX_CNT=100
+        HOST_FILE="/shared/hostfile"
+        DATASET=hpc_image_testing_zep
+        if [ "${HOSTNAME##*-}" == "0" ]; then
+          echo "Waiting for other nodes to complete"
+          if [[ ! -f $HOST_FILE ]]
+          then
+            echo "Host file missing, exiting"
+            exit 1
+          fi
+          NUM_HOSTS=\$((\$(wc -l < $HOST_FILE) - 1))
+          echo "Found hostfile, Number of hosts = $NUM_HOSTS"
+          while ((\$(find /shared -maxdepth 1 -name "${HOSTNAME%%-*}*-done" -type f | wc -l) < NUM_HOSTS && cnt < MAX_CNT ))
+          do
+            sleep 30
+            ((++cnt))
+          done
+          if (( cnt >= MAX_CNT )); then
+            echo "Exiting with error"
+            exit 1
+          fi
+          ramble config --scope=site add "config:upload:type:BigQuery"
+          ramble config --scope=site add "config:upload:uri:${DATASET}"
+          # ramble repo add --scope=site /shared/ramble-applications
+          # ramble repo add --scope=site -t modifiers /shared/ramble-applications
+          echo "Updating permissions on shared NFS"
+          chmod -R a+rwX /shared
+          echo "Running ramble commands"
+          su ramble-runner -c ". ~/.bashrc && \
+                               ramble workspace create -d /shared/test_workspace -c /shared/ramble.yaml -t /shared/execute_experiment.tpl && \
+                               cd /shared/test_workspace && \
+                               chmod -R a+rwX /shared/test_workspace && \
+                               ramble workspace activate /shared/test_workspace && \
+                               ramble workspace setup && \
+                               ramble on && \
+                               ramble workspace analyze --upload"
+        fi
+
+  - id: config-startup
+    source: modules/scripts/startup-script
+    settings:
+      configure_ssh_host_patterns:
+      - '*'
+      runners:
+      - type: shell
+        destination: /tmp/create_user.sh
+        content: |
+          #!/bin/bash
+          useradd ramble-runner -u 4000
+      - type: shell
+        destination: /tmp/gen_hostfile.sh
+        content: |
+          #!/bin/bash
+          if [ "${HOSTNAME##*-}" == "0" ]; then
+            rm -f /shared/hostfile
+            touch /shared/hostfile
+            i=0
+            while true; do
+              ping ${HOSTNAME%-*}-${i} -c 1 &> /dev/null
+              if [ $? == 0 ]; then
+                # Add host to hostfile
+                echo "${HOSTNAME%-*}-${i}" >> /shared/hostfile
+              else
+                break
+              fi
+              i=` echo "$i+1" | bc`
+            done
+            chmod a+rw /shared/hostfile
+          fi
+      - $(spack-execute.spack_runner)
+      - $(ramble-execute.ramble_runner)
+      - type: shell
+        destination: /tmp/mark_done.sh
+        content: |
+          #!/bin/bash
+          if [ "${HOSTNAME##*-}" != "0" ]; then
+            touch /shared/${HOSTNAME}-done
+          fi
+
+  #################
+  # Compute nodes #
+  #################
+  - id: shared-fs
+    source: community/modules/file-system/nfs-server
+    use:
+    - network1
+    settings:
+      machine_type: n2-standard-16
+      disk_size: 1000
+      local_mounts: ['/shared', '/home']
+
+  - id: vm-instance
+    source: modules/compute/vm-instance
+    use:
+    - network1
+    - shared-fs
+    - config-startup
+    settings:
+      instance_count: $(vars.num_instances)
+      machine_type: $(vars.compute_machine_type)
+      instance_image:
+        name: $(vars.image_name)
+        project: $(vars.image_project)
+
+  - id: wait-for-instance-0
+    source: community/modules/scripts/wait-for-startup
+    settings:
+      instance_name: $(vm-instance.name[0])
