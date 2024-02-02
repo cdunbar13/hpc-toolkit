@@ -21,6 +21,7 @@ vars:
   deployment_name: # the output directory
   region: us-central1
   zone: us-central1-c
+  subnetwork: hpc-image-vpc-primary-subnet
 
   # Settings for vm-instance
   compute_machine_type:
@@ -32,24 +33,34 @@ vars:
     # vm_count: $(vars.num_instances)  # not set to avoid potential deadlock due to Terraform's max parallelism
     collocation: "COLLOCATED"
     max_distance: 1
+  system_user_name: imb_user
+  system_user_uid: 1104762904
+  system_user_gid: 1104762904
 
-  # Settings for wait-for-startup
-  timeout: 7200
+terraform_backend_defaults:
+  type: gcs
+  configuration:
+    bucket: hpc-image-deployments
 
 deployment_groups:
 - group: primary
   modules:
+
   - id: network1
-    source: modules/network/pre-existing-vpc
-    settings:
-      network_name: hpc-image-testing-net
-      subnetwork_name: hpc-image-vpc-primary-subnet
+    source: modules/network/vpc
+    # settings:
+    #   network_name: hpc-image-testing-net
+    #   subnetwork_name: $(vars.subnetwork)
 
   - id: spack-setup
     source: community/modules/scripts/spack-setup
     settings:
       install_dir: /shared/spack
-      spack_ref: 'v0.21.0'
+      spack_ref: '5d50ad3941ebeee95d972baff265e31be22a380a'
+      chmod_mode: a+rwX
+      system_user_name: $(vars.system_user_name)
+      system_user_uid: $(vars.system_user_uid)
+      system_user_gid: $(vars.system_user_gid)
 
   - id: spack-execute
     source: community/modules/scripts/spack-execute
@@ -58,8 +69,10 @@ deployment_groups:
     settings:
       commands: |
         if [ "${HOSTNAME##*-}" == "0" ]; then
-          mkdir -p /shared/spack-packages/packages
-          if [ ! -f /shared/spack-packages/repo.yaml ]; then
+          # Setup ssh key for spack/ramble user - assumes both scripts are run from the same user
+          bash /usr/local/ghpc/setup-ssh-keys.sh
+          if [ ! -d /shared/spack-packages/packages ]; then
+            mkdir -p /shared/spack-packages/packages
             echo -e "repo:\n  namespace: googleaux" > /shared/spack-packages/repo.yaml
           fi
           cp -r /shared/spack/var/spack/repos/builtin/packages/intel-mpi-benchmarks /shared/spack-packages/packages/intel-mpi-benchmarks
@@ -70,23 +83,32 @@ deployment_groups:
           git checkout ${PKB_GITHUB_COMMIT}
           cp 'perfkitbenchmarker/data/intelmpi.patch' '/shared/spack-packages/packages/intel-mpi-benchmarks/'
           popd
+
           pushd /shared/spack-packages/packages/intel-mpi-benchmarks
           sed -i -e '0,/.*patch(.*/{//a \ \ \ \ # tail latency patch from perfkitbenchmarker\n\ \ \ \ patch("intelmpi.patch", when="+tail_latency", level=3)' -e '}' package.py
           sed -i -e '0,/.*variant(.*/{//a \ \ \ \ # tail latency patch from perfkitbenchmarker\n\ \ \ \ variant("tail_latency", default=False, description="enable tail_latency patch")' -e '}' package.py
+          
           spack repo add --scope=site /shared/spack-packages
+          
           spack config --scope=site add "concretizer:targets:host_compatible:false"
           spack config --scope=site add "config:build_stage:[/shared/spack_stage]"
           spack config --scope=site add "packages:all:permissions:read:world"
-          # spack mirror add --scope=site gcs_source gs://internal-mirror/software
-          # spack mirror add --scope=site gcs_cache gs://spack-internal/v0.21.0
-          # spack buildcache keys --install --trust
+          
+          spack mirror add --scope=site gcs_source gs://internal-spack-software
+          spack mirror add --scope=site gcs_cache gs://spack-internal/v0.21.0
+          
+          spack buildcache keys --install --trust --force
         fi
 
   - id: ramble-setup
     source: community/modules/scripts/ramble-setup
     settings:
       install_dir: /shared/ramble
-      ramble_ref: 'develop'
+      ramble_ref: 'e6b4edafa78d58396c355b402daa478ba7c2e9f9'
+      chmod_mode: a+rwX
+      system_user_name: $(vars.system_user_name)
+      system_user_uid: $(vars.system_user_uid)
+      system_user_gid: $(vars.system_user_gid)
 
   - id: ramble-execute
     source: community/modules/scripts/ramble-execute
@@ -126,21 +148,21 @@ deployment_groups:
             echo "Exiting with error"
             exit 1
           fi
+
           ramble config --scope=site add "config:upload:type:BigQuery"
           ramble config --scope=site add "config:upload:uri:${DATASET}"
-          # ramble repo add --scope=site /shared/ramble-applications
-          # ramble repo add --scope=site -t modifiers /shared/ramble-applications
-          echo "Updating permissions on shared NFS"
-          chmod -R a+rwX /shared
+
+          ramble repo add --scope=site /shared/ramble-applications
+          ramble repo add --scope=site -t modifiers /shared/ramble-applications
+
           echo "Running ramble commands"
-          su ramble-runner -c ". ~/.bashrc && \
-                               ramble workspace create -d /shared/test_workspace -c /shared/ramble.yaml -t /shared/execute_experiment.tpl && \
-                               cd /shared/test_workspace && \
-                               chmod -R a+rwX /shared/test_workspace && \
-                               ramble workspace activate /shared/test_workspace && \
-                               ramble workspace setup && \
-                               ramble on && \
-                               ramble workspace analyze --upload"
+          ramble workspace create -d /shared/test_workspace -c /shared/ramble.yaml -t /shared/execute_experiment.tpl
+          chmod -R a+rwX /shared/test_workspace
+          cd /shared/test_workspace
+          ramble workspace activate /shared/test_workspace
+          ramble workspace setup
+          ramble on
+          ramble workspace analyze --upload
         fi
 
   - id: config-startup
@@ -150,10 +172,26 @@ deployment_groups:
       - '*'
       runners:
       - type: shell
-        destination: /tmp/create_user.sh
+        destination: /tmp/clone_gob.sh
         content: |
           #!/bin/bash
-          useradd ramble-runner -u 4000
+          cd /shared
+          if [ "${HOSTNAME##*-}" == "0" ]; then
+            mkdir gcompute-tools
+            git clone 'https://gerrit.googlesource.com/gcompute-tools' /shared/gcompute-tools
+            sed -i "s|/usr/bin/python|/usr/bin/env python3|g" /shared/gcompute-tools/git-cookie-authdaemon
+            export HOME=/tmp
+            python3 /shared/gcompute-tools/git-cookie-authdaemon
+            git clone 'https://cloudhpc.googlesource.com/spack-packages' /shared/spack-packages
+            git clone 'https://cloudhpc.googlesource.com/ramble-applications' /shared/ramble-applications
+            git clone 'https://cloudhpc.googlesource.com/ramble-configs' /shared/ramble-configs
+            kill -9 `ps aux | grep git-cookie | grep -v "grep" | awk '{print $2}'`
+          fi
+      - type: shell
+        destination: /tmp/update_shared_dir.sh
+        content: |
+          #!/bin/bash
+          chmod -R a+rwX /shared
       - type: shell
         destination: /tmp/gen_hostfile.sh
         content: |
@@ -208,8 +246,13 @@ deployment_groups:
       instance_image:
         name: $(vars.image_name)
         project: $(vars.image_project)
+      service_account_email: 116875057246-compute@developer.gserviceaccount.com
+      service_account_scopes:
+      - https://www.googleapis.com/auth/cloud-platform
+      - https://www.googleapis.com/auth/gerritcodereview
 
   - id: wait-for-instance-0
     source: community/modules/scripts/wait-for-startup
     settings:
       instance_name: $(vm-instance.name[0])
+      timeout: 14400

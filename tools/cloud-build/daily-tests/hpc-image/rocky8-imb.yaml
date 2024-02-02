@@ -48,14 +48,23 @@ steps:
   - -c
   - |
     set -x -e
-    BUILD_ID_FULL=$BUILD_ID
-    BUILD_ID_SHORT=$${BUILD_ID_FULL:0:6}
+    export BUILD_ID_FULL=$BUILD_ID
+    export BUILD_ID_SHORT=$${BUILD_ID_FULL:0:6}
     GOB_TEST_PATH=/workspace/hpc-toolkit-blueprints/intel-mpi-benchmarks
 
     cp ghpc /usr/local/bin
-    git clone https://gerrit.googlesource.com/gcompute-tools
+    git clone $$TOOLS_URL
     python3 gcompute-tools/git-cookie-authdaemon
-    git clone https://cloudhpc.googlesource.com/hpc-toolkit-blueprints
+    git clone $$BLUEPRINTS_URL
 
-    cd /workspace/tools/cloud-build/daily-tests/hpc-image
-    python3 image_tester.py -p cloud-hpc-image-public -f hpc-rocky-linux-8 -z us-central1-a,us-central1-b,us-central1-c -n 3 -r "$${GOB_TEST_PATH}/ramble.yaml"
+
+    python3 -u /workspace/tools/cloud-build/daily-tests/hpc-image/image_tester.py -p cloud-hpc-image-public -f hpc-rocky-linux-8 -z us-west1-b,us-east1-c,us-east1-b,us-east1-d,us-central1-a,us-central1-b,us-central1-c,us-central1-f -c 1 -n 1 -r ramble.yaml 
+    # "$${GOB_TEST_PATH}/ramble.yaml"
+  secretEnv: ['TOOLS_URL', 'BLUEPRINTS_URL']
+
+availableSecrets:
+  secretManager:
+  - versionName: projects/cloud-hpc-image-devel/secrets/TOOLS_URL/versions/1
+    env: 'TOOLS_URL'
+  - versionName: projects/cloud-hpc-image-devel/secrets/BLUEPRINTS_URL/versions/1
+    env: 'BLUEPRINTS_URL'

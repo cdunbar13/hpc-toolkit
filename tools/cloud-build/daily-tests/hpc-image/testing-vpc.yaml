@@ -23,195 +23,213 @@ vars:
 deployment_groups:
 - group: primary
   modules:
+
   - id: hpc-image-network
     source: modules/network/vpc
     settings:
-      network_name: hpc-image-testing-net
+      network_name: hpc-image-testing-net-2
+      subnetworks:
+      - subnet_name: hpc-image-us-central1-subnet
+        subnet_region: us-central1
+        subnet_ip: 10.1.0.0/16
+      - subnet_name: hpc-image-us-west1-subnet
+        subnet_region: us-west1
+        subnet_ip: 10.2.0.0/16
+      - subnet_name: hpc-image-us-east1-subnet
+        subnet_region: us-east1
+        subnet_ip: 10.3.0.0/16
 
-  - id: bq-dataset
-    source: community/modules/database/bigquery-dataset
-    settings:
-      dataset_id: hpc_image_testing_zep
+  # - id: bq-dataset
+  #   source: community/modules/database/bigquery-dataset
+  #   settings:
+  #     dataset_id: hpc_image_testing_zep
 
-  - id: experiments-table
-    source: community/modules/database/bigquery-table
-    use: [bq-dataset]
-    settings:
-      table_id: experiments
-      table_schema:
-        '
-        [
-          {
-            "name": "id",
-            "mode": "NULLABLE",
-            "type": "STRING",
-            "description": null,
-            "fields": []
-          },
-          {
-            "name": "data",
-            "mode": "NULLABLE",
-            "type": "JSON",
-            "description": null,
-            "fields": []
-          },
-          {
-            "name": "bulk_hash",
-            "mode": "NULLABLE",
-            "type": "STRING",
-            "description": null,
-            "fields": []
-          },
-          {
-            "name": "application_name",
-            "mode": "NULLABLE",
-            "type": "STRING",
-            "description": null,
-            "fields": []
-          },
-          {
-            "name": "name",
-            "mode": "NULLABLE",
-            "type": "STRING",
-            "description": null,
-            "fields": []
-          },
-          {
-            "name": "foms",
-            "mode": "NULLABLE",
-            "type": "JSON",
-            "description": null,
-            "fields": []
-          },
-          {
-            "name": "processes_per_node",
-            "mode": "NULLABLE",
-            "type": "INTEGER",
-            "description": null,
-            "fields": []
-          },
-          {
-            "name": "n_nodes",
-            "mode": "NULLABLE",
-            "type": "INTEGER",
-            "description": null,
-            "fields": []
-          },
-          {
-            "name": "n_ranks",
-            "mode": "NULLABLE",
-            "type": "INTEGER",
-            "description": null,
-            "fields": []
-          },
-          {
-            "name": "n_threads",
-            "mode": "NULLABLE",
-            "type": "INTEGER",
-            "description": null,
-            "fields": []
-          },
-          {
-            "name": "workload_name",
-            "mode": "NULLABLE",
-            "type": "STRING",
-            "description": null,
-            "fields": []
-          },
-          {
-            "name": "timestamp",
-            "mode": "NULLABLE",
-            "type": "DATETIME",
-            "description": null,
-            "fields": []
-          },
-          {
-            "name": "workspace_name",
-            "mode": "NULLABLE",
-            "type": "STRING",
-            "description": null,
-            "fields": []
-          },
-          {
-            "name": "node_type",
-            "mode": "NULLABLE",
-            "type": "STRING",
-            "description": null,
-            "fields": []
-          },
-          {
-            "name": "workspace_hash",
-            "mode": "NULLABLE",
-            "type": "STRING",
-            "description": null,
-            "fields": []
-          }
-        ]
-        '
+  # - id: experiments-table
+  #   source: community/modules/database/bigquery-table
+  #   use: [bq-dataset]
+  #   settings:
+  #     table_id: experiments
+  #     table_schema:
+  #       '
+  #       [
+  #         {
+  #           "name": "id",
+  #           "mode": "NULLABLE",
+  #           "type": "STRING",
+  #           "description": null,
+  #           "fields": []
+  #         },
+  #         {
+  #           "name": "user",
+  #           "mode": "NULLABLE",
+  #           "type": "STRING",
+  #           "description": null,
+  #           "fields": []
+  #         },
+  #         {
+  #           "name": "data",
+  #           "mode": "NULLABLE",
+  #           "type": "JSON",
+  #           "description": null,
+  #           "fields": []
+  #         },
+  #         {
+  #           "name": "bulk_hash",
+  #           "mode": "NULLABLE",
+  #           "type": "STRING",
+  #           "description": null,
+  #           "fields": []
+  #         },
+  #         {
+  #           "name": "application_name",
+  #           "mode": "NULLABLE",
+  #           "type": "STRING",
+  #           "description": null,
+  #           "fields": []
+  #         },
+  #         {
+  #           "name": "name",
+  #           "mode": "NULLABLE",
+  #           "type": "STRING",
+  #           "description": null,
+  #           "fields": []
+  #         },
+  #         {
+  #           "name": "foms",
+  #           "mode": "NULLABLE",
+  #           "type": "JSON",
+  #           "description": null,
+  #           "fields": []
+  #         },
+  #         {
+  #           "name": "processes_per_node",
+  #           "mode": "NULLABLE",
+  #           "type": "INTEGER",
+  #           "description": null,
+  #           "fields": []
+  #         },
+  #         {
+  #           "name": "n_nodes",
+  #           "mode": "NULLABLE",
+  #           "type": "INTEGER",
+  #           "description": null,
+  #           "fields": []
+  #         },
+  #         {
+  #           "name": "n_ranks",
+  #           "mode": "NULLABLE",
+  #           "type": "INTEGER",
+  #           "description": null,
+  #           "fields": []
+  #         },
+  #         {
+  #           "name": "n_threads",
+  #           "mode": "NULLABLE",
+  #           "type": "INTEGER",
+  #           "description": null,
+  #           "fields": []
+  #         },
+  #         {
+  #           "name": "workload_name",
+  #           "mode": "NULLABLE",
+  #           "type": "STRING",
+  #           "description": null,
+  #           "fields": []
+  #         },
+  #         {
+  #           "name": "timestamp",
+  #           "mode": "NULLABLE",
+  #           "type": "DATETIME",
+  #           "description": null,
+  #           "fields": []
+  #         },
+  #         {
+  #           "name": "workspace_name",
+  #           "mode": "NULLABLE",
+  #           "type": "STRING",
+  #           "description": null,
+  #           "fields": []
+  #         },
+  #         {
+  #           "name": "node_type",
+  #           "mode": "NULLABLE",
+  #           "type": "STRING",
+  #           "description": null,
+  #           "fields": []
+  #         },
+  #         {
+  #           "name": "workspace_hash",
+  #           "mode": "NULLABLE",
+  #           "type": "STRING",
+  #           "description": null,
+  #           "fields": []
+  #         }
+  #       ]
+  #       '
 
-  - id: foms-table
-    source: community/modules/database/bigquery-table
-    use: [bq-dataset]
-    settings:
-      table_id: foms
-      table_schema:
-        '
-        [
-          {
-            "name": "name",
-            "mode": "NULLABLE",
-            "type": "STRING",
-            "description": null,
-            "fields": []
-          },
-          {
-            "name": "value",
-            "mode": "NULLABLE",
-            "type": "STRING",
-            "description": null,
-            "fields": []
-          },
-          {
-            "name": "unit",
-            "mode": "NULLABLE",
-            "type": "STRING",
-            "description": null,
-            "fields": []
-          },
-          {
-            "name": "context",
-            "mode": "NULLABLE",
-            "type": "STRING",
-            "description": null,
-            "fields": []
-          },
-          {
-            "name": "experiment_id",
-            "mode": "NULLABLE",
-            "type": "STRING",
-            "description": null,
-            "fields": []
-          },
-          {
-            "name": "experiment_name",
-            "mode": "NULLABLE",
-            "type": "STRING",
-            "description": null,
-            "fields": []
-          },
-          {
-            "name": "origin",
-            "mode": "NULLABLE",
-            "type": "STRING",
-            "description": null,
-            "fields": []
-          },
-          {
-            "name": "origin_type",
-            "mode": "NULLABLE",
-            "type": "STRING",
-            "description": null,
-            "fields": []
-          }
-        ]
-        '
+  # - id: foms-table
+  #   source: community/modules/database/bigquery-table
+  #   use: [bq-dataset]
+  #   settings:
+  #     table_id: foms
+  #     table_schema:
+  #       '
+  #       [
+  #         {
+  #           "name": "name",
+  #           "mode": "NULLABLE",
+  #           "type": "STRING",
+  #           "description": null,
+  #           "fields": []
+  #         },
+  #         {
+  #           "name": "value",
+  #           "mode": "NULLABLE",
+  #           "type": "STRING",
+  #           "description": null,
+  #           "fields": []
+  #         },
+  #         {
+  #           "name": "unit",
+  #           "mode": "NULLABLE",
+  #           "type": "STRING",
+  #           "description": null,
+  #           "fields": []
+  #         },
+  #         {
+  #           "name": "context",
+  #           "mode": "NULLABLE",
+  #           "type": "STRING",
+  #           "description": null,
+  #           "fields": []
+  #         },
+  #         {
+  #           "name": "experiment_id",
+  #           "mode": "NULLABLE",
+  #           "type": "STRING",
+  #           "description": null,
+  #           "fields": []
+  #         },
+  #         {
+  #           "name": "experiment_name",
+  #           "mode": "NULLABLE",
+  #           "type": "STRING",
+  #           "description": null,
+  #           "fields": []
+  #         },
+  #         {
+  #           "name": "origin",
+  #           "mode": "NULLABLE",
+  #           "type": "STRING",
+  #           "description": null,
+  #           "fields": []
+  #         },
+  #         {
+  #           "name": "origin_type",
+  #           "mode": "NULLABLE",
+  #           "type": "STRING",
+  #           "description": null,
+  #           "fields": []
+  #         }
+  #       ]
+  #       '
