@@ -58,7 +58,7 @@ steps:
     git clone $$BLUEPRINTS_URL
 
 
-    python3 -u /workspace/tools/cloud-build/daily-tests/hpc-image/image_tester.py -p cloud-hpc-image-public -f hpc-rocky-linux-8 -z us-west1-b,us-east1-c,us-east1-b,us-east1-d,us-central1-a,us-central1-b,us-central1-c,us-central1-f -c 1 -n 1 -r ramble.yaml 
+    python3 -u /workspace/tools/cloud-build/daily-tests/hpc-image/image_tester.py -p cloud-hpc-image-public -f hpc-rocky-linux-8 -z us-west1-b,us-east1-c,us-east1-b,us-east1-d,us-central1-a,us-central1-b,us-central1-c,us-central1-f -c 1 -n 1 -r ramble.yaml -d rl8-1
     # "$${GOB_TEST_PATH}/ramble.yaml"
   secretEnv: ['TOOLS_URL', 'BLUEPRINTS_URL']
 

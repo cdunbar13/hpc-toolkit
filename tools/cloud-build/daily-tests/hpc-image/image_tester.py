@@ -18,15 +18,17 @@ import sys
 import uuid
 import tarfile
 import argparse
+import getpass
 import time
 import shutil
 import subprocess
 from typing import List, Union
 
-
 # TODO Replace gcloud commands with gcloud pip module commands
 RUN_DIR = os.getcwd()
 SCRIPT_DIR = sys.path[0]
+MOD_DIR = os.path.join(SCRIPT_DIR, "modifiers")
+MOD_TAR = os.path.join(SCRIPT_DIR, "modifiers.tar.gz")
 BUILD_PROJECT_ID = "cloud-hpc-image-devel"
 GHPC_DIR = os.path.join(RUN_DIR, "hpc-toolkit")
 GHPC_BIN_SRC = os.path.join(GHPC_DIR, "ghpc")
@@ -52,7 +54,7 @@ USAGE = '''
 destroy_procs: List[subprocess.Popen] = []
 
 def print_divider(msg: str):
-    print(f" {msg}".center(80, "*") + "\n")
+    print(f" {msg} ".center(80, "*") + "\n")
 
 def print_proc_lines(io: Union[None, io.TextIOWrapper]):
     if io is not None:
@@ -129,13 +131,26 @@ def get_data(image_name: str, deployment_name: str, output_dir: str) -> None:
           f"{output_dir}/{image_name} </dev/null"
     run_command(cmd, "Error downloading Ramble test results")
 
+def send_file_to_bucket(filename: str, bucket_name: str) -> None:
+    cmd = f"gsutil cp {filename} gs://{bucket_name}"
+    run_command(cmd, f"Uploading {filename} to GCS bucket", 
+                f"Error downloading uploading {filename} to {bucket_name}")
+
 def send_deployment_to_bucket(deployment_name: str, bucket_name: str) -> None:
     outfile = f"{deployment_name}.tar.gz"
     with tarfile.open(outfile, "w:gz") as tar:
         tar.add(deployment_name)
-    cmd = f"gsutil cp {outfile} gs://{bucket_name}"
-    run_command(cmd, f"Uploading {deployment_name} folder to GCS bucket", 
-                "Error downloading Ramble test results")
+    send_file_to_bucket(outfile, bucket_name)
+    
+def send_workspace_to_bucket(deployment_name: str, zone: str, bucket_name: str) -> None:
+    cmd = f"gcloud compute scp --zone {zone} --recurse {deployment_name}-0:/shared/test_workspace ."
+    run_command(cmd, "Copying workspace to the local drive", 
+                f"Error copying ramble workspace from {deployment_name}-0 to here", 
+                print_out=True)
+    outfile = f"{deployment_name}_workspace.tar.gz"
+    with tarfile.open(outfile, "w:gz") as tar:
+        tar.add("test_workspace")
+    send_file_to_bucket(outfile, bucket_name)
 
 def build_ghpc(branch: str = "develop") -> None:
     if shutil.which("ghpc") is not None:
@@ -161,12 +176,19 @@ def build_network() -> None:
 
 def create_deployment(project:str, image_name: str, zone: str, region: str,
                       ramble_file: str, machine_type: str = "c2-standard-60",
-                      num_vms: int = 8) -> str:
-    # if "BUILD_ID_SHORT" in os.environ:
-    #     build_id = os.environ["BUILD_ID_SHORT"][:6]
-    # else:
-    build_id = uuid.uuid4().hex[:6]
-    dep_name=f"{image_name.replace('linux-', '')}-{build_id}"
+                      num_vms: int = 8, dep_prefix = None) -> str:
+    build_id = ""
+    if "BUILD_ID_SHORT" in os.environ:
+        build_id += f"{os.environ['BUILD_ID_SHORT'][:6]}-"
+    build_id += f"{uuid.uuid4().hex[:6]}"
+    if dep_prefix is not None and len(dep_prefix) > 0:
+        dep_name=f"{dep_prefix}-{build_id}"
+    else:
+        dep_name = build_id
+
+    with tarfile.open(MOD_TAR, "w:gz") as tar:
+        tar.add(MOD_DIR, arcname=os.path.basename(MOD_DIR))
+
     dep_vars = [f"project_id={BUILD_PROJECT_ID}",
                 f"ramble_config_location={ramble_file}",
                 "add_deployment_name_before_prefix=true",
@@ -176,7 +198,19 @@ def create_deployment(project:str, image_name: str, zone: str, region: str,
                 f"region={region}",
                 f"zone={zone}",
                 f"deployment_name={dep_name}",
-                f"num_instances={num_vms}"]
+                f"num_instances={num_vms}",
+                f"modifiers_loc={MOD_TAR}",
+                f"debug_bucket_name={DEPLOYMENT_BUCKET}"
+                ]
+    sys_user = "system_user_name="
+    if "USER" in os.environ:
+        sys_user += os.environ['USER']
+    elif "TRIGGER_ID" in os.environ:
+        sys_user += os.environ['TRIGGER_ID'].lower()
+    else:
+        sys_user += "cloudbuild_manual"
+    dep_vars.append(sys_user)
+
     cmd = f"ghpc create -w {TEMPLATE_BP} --vars {','.join(dep_vars)}"
     run_command(cmd, f"Create Deployment in zone: {zone}", 
                 "Error creating microbenchmark deployment", print_out=True)
@@ -205,11 +239,15 @@ def deploy_tests(dep_dir: str, project: str, zone: str, dep_name: str) -> str:
             except subprocess.SubprocessError as e:
                 print(e)
             print("Destroying deployment then exiting")
-            time.sleep(60)
+            # try:
+            #     send_workspace_to_bucket(dep_name, zone, DEPLOYMENT_BUCKET)
+            # except subprocess.SubprocessError as e:
+            #     print(e)
+            # time.sleep(1200)
             destroy_deployment(dep_dir)
             test_exit(1)
     print(f"Test of {dep_dir} has completed")
-    return ""
+    return "success"
 
 def destroy_deployment(dep_dir: str) -> None:
     cmd = f"ghpc destroy {dep_dir} --auto-approve"
@@ -245,7 +283,8 @@ def test_exit(rc: int = 0, timeout = 300):
 
 def run_tests(image_project: str, ramble_file: str, zones: List[str] = ["us-central1-a"],
               img_family: str = None, img_names: str = None, cnt: int = 1, nth: int = 0,
-              machine_type: str = "c2-standard-60", num_vms: int = 8):
+              machine_type: str = "c2-standard-60", num_vms: int = 8, retries: int = 3, 
+              dep_prefix: str = None):
     if machine_type is None:
         machine_type = "c2-standard-60"
     if cnt is None or cnt <= 0:
@@ -258,6 +297,8 @@ def run_tests(image_project: str, ramble_file: str, zones: List[str] = ["us-cent
         img_names = set()
     if num_vms is None or num_vms < 0:
         num_vms = 8
+    if retries is None or retries < 0 or retries > 6:
+        retries = 3
 
     cmd = "gcloud info"
     res = run_command(cmd, "Error getting gcloud info")
@@ -265,7 +306,6 @@ def run_tests(image_project: str, ramble_file: str, zones: List[str] = ["us-cent
     build_network()
     if img_family is not None and cnt > 0:
         imgs = get_latest_n_images(image_project, img_family, cnt + nth)
-    print(imgs)
     img_names.update(imgs[nth:nth+cnt])
     zones = zones.split(",")
     print("Testing the following images:")
@@ -274,17 +314,23 @@ def run_tests(image_project: str, ramble_file: str, zones: List[str] = ["us-cent
     for img in img_names:
         print(f"Starting tests on image: {img}")
         new_zones = zones.copy()
-        for cnt, zone in enumerate(zones):
-            region = zone[:-2]
-            dep_name = create_deployment(image_project, img, zone, region,
-                                         ramble_file, machine_type, num_vms)
-            dep_dir = os.path.join(RUN_DIR, dep_name)
-            res = deploy_tests(dep_dir, image_project, zone, dep_name)
-            if res == "":
-                print("Tests succeeded, destroying deployment")
-                destroy_deployment(dep_dir)
+        res = ""
+        for i in range(retries+1):
+            for cnt, zone in enumerate(zones):
+                region = zone[:-2]
+                dep_name = create_deployment(image_project, img, zone, region,
+                                            ramble_file, machine_type, num_vms,
+                                            dep_prefix)
+                dep_dir = os.path.join(RUN_DIR, dep_name)
+                res = deploy_tests(dep_dir, image_project, zone, dep_name)
+                if res == "success":
+                    print("Tests succeeded, destroying deployment")
+                    destroy_deployment(dep_dir)
+                    break
+                new_zones.append(new_zones.pop(0))
+            if res == "success":
                 break
-            new_zones.append(new_zones.pop(0))
+            time.sleep(60 * (2 ** i))
         zones = new_zones.copy()
         
         if cnt == len(zones)-1:
@@ -313,6 +359,11 @@ if __name__ == "__main__":
     parser.add_argument("-i", "--image_names",
                         help="Comma delimited list of images to test from " \
                              "project")
+    parser.add_argument("-t", "--retries", type=int, default=3,
+                        help="Number of retries to attempt (default = 3, max = 6)," \
+                             "used in expoential backoff (60s * (2^retry#))")
+    parser.add_argument("-d", "--deployment_prefix", type=str,
+                        help="Prefix for the deployment name")
     parser.add_argument("-z", "--zones",
                         help="Comma delimited list of zones to run test in " \
                              "(default = us-central1-a). They are tried in " \
@@ -332,5 +383,6 @@ if __name__ == "__main__":
 
     run_tests(args.image_project, rf, args.zones, args.image_family,
               args.image_names, args.num_images, args.nth_image, 
-              args.machine_type, args.num_vms)
+              args.machine_type, args.num_vms, args.retries,
+              args.deployment_prefix)
     test_exit()

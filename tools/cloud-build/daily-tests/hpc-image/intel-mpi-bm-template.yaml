@@ -36,6 +36,9 @@ vars:
   system_user_name: imb_user
   system_user_uid: 1104762904
   system_user_gid: 1104762904
+  modifiers_loc:
+  debug_bucket_name:
+  debug_bucket_mnt: /debug_bucket
 
 terraform_backend_defaults:
   type: gcs
@@ -76,17 +79,17 @@ deployment_groups:
             echo -e "repo:\n  namespace: googleaux" > /shared/spack-packages/repo.yaml
           fi
           cp -r /shared/spack/var/spack/repos/builtin/packages/intel-mpi-benchmarks /shared/spack-packages/packages/intel-mpi-benchmarks
-          PKB_GITHUB_URL="https://github.com/GoogleCloudPlatform/PerfKitBenchmarker.git"
-          PKB_GITHUB_COMMIT="4576e0d89343941f1c1eda4a169862ba96e17f03"
-          git clone ${PKB_GITHUB_URL} perfkitbenchmarker
-          pushd perfkitbenchmarker
-          git checkout ${PKB_GITHUB_COMMIT}
-          cp 'perfkitbenchmarker/data/intelmpi.patch' '/shared/spack-packages/packages/intel-mpi-benchmarks/'
-          popd
+          # PKB_GITHUB_URL="https://github.com/GoogleCloudPlatform/PerfKitBenchmarker.git"
+          # PKB_GITHUB_COMMIT="4576e0d89343941f1c1eda4a169862ba96e17f03"
+          # git clone ${PKB_GITHUB_URL} perfkitbenchmarker
+          # pushd perfkitbenchmarker
+          # git checkout ${PKB_GITHUB_COMMIT}
+          # cp 'perfkitbenchmarker/data/intelmpi.patch' '/shared/spack-packages/packages/intel-mpi-benchmarks/'
+          # popd
 
-          pushd /shared/spack-packages/packages/intel-mpi-benchmarks
-          sed -i -e '0,/.*patch(.*/{//a \ \ \ \ # tail latency patch from perfkitbenchmarker\n\ \ \ \ patch("intelmpi.patch", when="+tail_latency", level=3)' -e '}' package.py
-          sed -i -e '0,/.*variant(.*/{//a \ \ \ \ # tail latency patch from perfkitbenchmarker\n\ \ \ \ variant("tail_latency", default=False, description="enable tail_latency patch")' -e '}' package.py
+          # pushd /shared/spack-packages/packages/intel-mpi-benchmarks
+          # sed -i -e '0,/.*patch(.*/{//a \ \ \ \ # tail latency patch from perfkitbenchmarker\n\ \ \ \ patch("intelmpi.patch", when="+tail_latency", level=3)' -e '}' package.py
+          # sed -i -e '0,/.*variant(.*/{//a \ \ \ \ # tail latency patch from perfkitbenchmarker\n\ \ \ \ variant("tail_latency", default=False, description="enable tail_latency patch")' -e '}' package.py
           
           spack repo add --scope=site /shared/spack-packages
           
@@ -104,7 +107,7 @@ deployment_groups:
     source: community/modules/scripts/ramble-setup
     settings:
       install_dir: /shared/ramble
-      ramble_ref: 'e6b4edafa78d58396c355b402daa478ba7c2e9f9'
+      ramble_ref: '17894aa9f2ad39ca118fb6b566ce1e8ece5f48b3'
       chmod_mode: a+rwX
       system_user_name: $(vars.system_user_name)
       system_user_uid: $(vars.system_user_uid)
@@ -127,7 +130,7 @@ deployment_groups:
           {command}
       commands: |
         cnt=0
-        MAX_CNT=100
+        MAX_CNT=300
         HOST_FILE="/shared/hostfile"
         DATASET=hpc_image_testing_zep
         if [ "${HOSTNAME##*-}" == "0" ]; then
@@ -139,21 +142,32 @@ deployment_groups:
           fi
           NUM_HOSTS=\$((\$(wc -l < $HOST_FILE) - 1))
           echo "Found hostfile, Number of hosts = $NUM_HOSTS"
-          while ((\$(find /shared -maxdepth 1 -name "${HOSTNAME%%-*}*-done" -type f | wc -l) < NUM_HOSTS && cnt < MAX_CNT ))
-          do
-            sleep 30
-            ((++cnt))
-          done
-          if (( cnt >= MAX_CNT )); then
-            echo "Exiting with error"
-            exit 1
-          fi
+          # while ((\$(find /shared -maxdepth 1 -name "${HOSTNAME%%-*}*-done" -type f | wc -l) < NUM_HOSTS && cnt < MAX_CNT ))
+          # do
+          #   sleep 10
+          #   ((++cnt))
+          # done
+          # echo "$cnt"
+          # if (( cnt >= MAX_CNT )); then
+          #   echo "Exiting with error"
+          #   exit 1
+          # fi
 
           ramble config --scope=site add "config:upload:type:BigQuery"
           ramble config --scope=site add "config:upload:uri:${DATASET}"
 
           ramble repo add --scope=site /shared/ramble-applications
           ramble repo add --scope=site -t modifiers /shared/ramble-applications
+
+          IMG_MOD_DIR="/shared/image_applications"
+          if [ ! -d "$IMG_MOD_DIR" ]; then
+            mkdir -p "$IMG_MOD_DIR"
+            echo -e "repo:\n  namespace: hpcimage" > "$IMG_MOD_DIR"/repo.yaml
+            echo -e "repo:\n  namespace: hpcimage" > "$IMG_MOD_DIR"/modifier_repo.yaml
+          fi
+          tar xf /run/modifiers.tar.gz -C "$IMG_MOD_DIR"
+          chmod -R a+rwX "$IMG_MOD_DIR"
+          ramble repo add --scope=site -t modifiers "$IMG_MOD_DIR"
 
           echo "Running ramble commands"
           ramble workspace create -d /shared/test_workspace -c /shared/ramble.yaml -t /shared/execute_experiment.tpl
@@ -162,7 +176,11 @@ deployment_groups:
           ramble workspace activate /shared/test_workspace
           ramble workspace setup
           ramble on
-          ramble workspace analyze --upload
+          ramble workspace analyze -f text json --upload && true
+          if [ $? -ne 0 ]; then
+            echo "Ramble failed to upload results"
+            touch /shared/failed
+          fi
         fi
 
   - id: config-startup
@@ -171,6 +189,9 @@ deployment_groups:
       configure_ssh_host_patterns:
       - '*'
       runners:
+      - type: data
+        destination: /run/modifiers.tar.gz
+        source: $(vars.modifiers_loc)
       - type: shell
         destination: /tmp/clone_gob.sh
         content: |
@@ -182,6 +203,7 @@ deployment_groups:
             sed -i "s|/usr/bin/python|/usr/bin/env python3|g" /shared/gcompute-tools/git-cookie-authdaemon
             export HOME=/tmp
             python3 /shared/gcompute-tools/git-cookie-authdaemon
+            sleep 10
             git clone 'https://cloudhpc.googlesource.com/spack-packages' /shared/spack-packages
             git clone 'https://cloudhpc.googlesource.com/ramble-applications' /shared/ramble-applications
             git clone 'https://cloudhpc.googlesource.com/ramble-configs' /shared/ramble-configs
@@ -191,7 +213,9 @@ deployment_groups:
         destination: /tmp/update_shared_dir.sh
         content: |
           #!/bin/bash
-          chmod -R a+rwX /shared
+          if [ "${HOSTNAME##*-}" == "0" ]; then
+            chmod -R a+rwX /shared
+          fi
       - type: shell
         destination: /tmp/gen_hostfile.sh
         content: |
@@ -215,16 +239,37 @@ deployment_groups:
       - $(spack-execute.spack_runner)
       - $(ramble-execute.ramble_runner)
       - type: shell
-        destination: /tmp/mark_done.sh
+        destination: /tmp/gather_workspace.sh
         content: |
           #!/bin/bash
-          if [ "${HOSTNAME##*-}" != "0" ]; then
-            touch /shared/${HOSTNAME}-done
+          if [ "${HOSTNAME##*-}" == "0" ]; then
+            cp /var/log/messages /shared/test_workspace/journal.out
+            tar cf $(vars.debug_bucket_mnt)/workspace_${HOSTNAME}.tar.gz /shared/test_workspace
           fi
+          if [ -f /shared/failed ]; then
+            exit 1
+          fi
+      # - type: shell
+      #   destination: /tmp/mark_done.sh
+      #   content: |
+      #     #!/bin/bash
+      #     if [ "${HOSTNAME##*-}" != "0" ]; then
+      #       touch /shared/${HOSTNAME}-done
+      #     fi
 
   #################
   # Compute nodes #
   #################
+  
+  - id: debug-bucket
+    source: modules/file-system/pre-existing-network-storage
+    settings:
+      remote_mount: $(vars.debug_bucket_name)
+      fs_type: gcsfuse
+      local_mount: $(vars.debug_bucket_mnt)
+      # Bucket will be read only.
+      mount_options: defaults,_netdev,implicit_dirs,allow_other
+
   - id: shared-fs
     source: community/modules/file-system/nfs-server
     use:
@@ -240,6 +285,7 @@ deployment_groups:
     - network1
     - shared-fs
     - config-startup
+    - debug-bucket
     settings:
       instance_count: $(vars.num_instances)
       machine_type: $(vars.compute_machine_type)
