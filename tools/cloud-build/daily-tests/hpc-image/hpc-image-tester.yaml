@@ -53,6 +53,7 @@ steps:
     git clone $$TOOLS_URL
     python3 gcompute-tools/git-cookie-authdaemon
     git clone $$BLUEPRINTS_URL
+    git -C hpc-toolkit-blueprints fetch origin refs/changes/40/7140/1&& git -C hpc-toolkit-blueprints checkout -b change-7140 FETCH_HEAD
 
     python3 -u /workspace/tools/cloud-build/daily-tests/hpc-image/image_tester.py -p $_PROJECT -f $_FAMILY -z $_ZONES -c $_IMG_CNT -n $_IMG_OFFSET -r "$${GOB_TEST_PATH}/ramble.yaml" -d "${_PREFIX}" -i $_IMAGES
   secretEnv: ['TOOLS_URL', 'BLUEPRINTS_URL']
