@@ -347,11 +347,12 @@ if __name__ == "__main__":
                              "in descending order, default = 1)")
     parser.add_argument("-n", "--nth_image", type=int, default = 0,
                         help="Start with nth most recent image (default = 0 == most recent)")
-    parser.add_argument("-m", "--machine_type",
+    parser.add_argument("-m", "--machine_type", type=str, 
+                        default="c2-standard-60",
                         help="Machine type to run on (default: c2-standard-60)")
     parser.add_argument("-v", "--num_vms", type=int, default=8,
                         help="Number of VMs in testing cluster (default 8)")
-    parser.add_argument("-i", "--image_names",
+    parser.add_argument("-i", "--image_names", nargs='?', const='', default=None,
                         help="Comma delimited list of images to test from " \
                              "project")
     parser.add_argument("-t", "--retries", type=int, default=3,
