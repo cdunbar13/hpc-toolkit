@@ -542,7 +542,7 @@ class Ethtool(BasicModifier):
 
 
     for k, v in section_list.items():
-        figure_of_merit_context(f'ethtool -{k}', regex="", output_format=f'ethtool -{k}')
+        figure_of_merit_context(f'ethtool option', regex="", output_format=f'-{k}')
         for section in v:
             figure_of_merit(section, fom_regex=r'\s*' + f'{section}'.replace('[', r'\[').replace(']', r'\]') + r'[:\s]+(?P<fom>.*)',
                             group_name='fom', units='', log_file='{ethtool_log}', contexts=[f'ethtool -{k}'])

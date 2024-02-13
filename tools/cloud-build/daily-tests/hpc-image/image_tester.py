@@ -239,11 +239,6 @@ def deploy_tests(dep_dir: str, project: str, zone: str, dep_name: str) -> str:
             except subprocess.SubprocessError as e:
                 print(e)
             print("Destroying deployment then exiting")
-            # try:
-            #     send_workspace_to_bucket(dep_name, zone, DEPLOYMENT_BUCKET)
-            # except subprocess.SubprocessError as e:
-            #     print(e)
-            # time.sleep(1200)
             destroy_deployment(dep_dir)
             test_exit(1)
     print(f"Test of {dep_dir} has completed")

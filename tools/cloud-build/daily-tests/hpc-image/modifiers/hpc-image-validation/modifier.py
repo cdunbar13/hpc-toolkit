@@ -9,11 +9,11 @@
 from ramble.modkit import *  # noqa: F403
 
 class HpcImageValidation(BasicModifier):
-    """Define a modifier for lspcu
+    """Define a modifier for a subset of hpc image validators
 
-    lscpu gives useful information about the underlying compute platform. This
-    modifier allows experiments to easily extract system information while the
-    experiment is being performed.
+    The commands here are used to validate the VMs used in the benchmark
+    testing of the HPC VM images.  As right now the output is collected
+    as a long single line string with newlines replaced with \n literals.
     """
     name = "hpc-image-validation"
 
@@ -24,6 +24,8 @@ class HpcImageValidation(BasicModifier):
     mode('standard', description='Tests for hpc-image VM validation')
     default_mode('standard')
 
+    # Commands to be run, keys are simple names for reading, values are the
+    # actual commands
     cmds = {"uname" : "uname -a",
             "cmdline": "cat /proc/cmdline",
             "network_irqs": "cat /sys/class/net/eth0/queues/tx-*/xps_cpus",
@@ -46,4 +48,8 @@ class HpcImageValidation(BasicModifier):
     # figure_of_merit("Current active profile", fom_regex=r'Current active profile:\s+(?P<fom>.*)', group_name='fom', units='', log_file='{tuned_adm_log}')
     
     def hpc_image_validation_exec(self):
+        """Create a list of bash commands based on the commands above.
+        Each command is run through sed to remove newlines and replace them with
+        \n literals
+        """    
         return [f'{v}' + r" | sed -E ':a;N;$!ba;s/\r{0,1}\n/\\n/g' >> {" + k + "_log}" for k,v in self.cmds.items()]
