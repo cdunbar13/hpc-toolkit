@@ -39,7 +39,7 @@ class HpcImageValidation(BasicModifier):
     for k,v in cmds.items():
         variable_modification(f'{k}_log', '{{experiment_run_dir}}/{name}.log'.format(name=k), method='set', modes=['standard'])
         archive_pattern(f'{k}.log')
-        figure_of_merit(f'{k}', fom_regex=r'(?P<fom>[\S\s\n]*)', group_name='fom', units='', log_file='{' + k + '_log}')
+        figure_of_merit(f'{v}', fom_regex=r'(?P<fom>[\S\s\n]*)', group_name='fom', units='', log_file='{' + k + '_log}')
     
     register_builtin('hpc_image_validation_exec', injection_method='append')
 
