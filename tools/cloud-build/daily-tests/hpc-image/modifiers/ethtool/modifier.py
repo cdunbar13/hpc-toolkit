@@ -550,6 +550,4 @@ class Ethtool(BasicModifier):
     register_builtin(f'ethtool_exec', injection_method='append')
 
     def ethtool_exec(self):
-        return [f'echo "ethtool -{k} >> ' + '{ethtool_log}' + 
-                f' && ethtool -{k} eth0 >> ' + 
-                '{ethtool_log}' for k in self.section_list.keys()]
+        return [f'ethtool -{k} eth0 >> ' + '{ethtool_log}' for k in self.section_list.keys()]
