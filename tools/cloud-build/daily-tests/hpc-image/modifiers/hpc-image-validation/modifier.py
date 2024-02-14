@@ -32,8 +32,8 @@ class HpcImageValidation(BasicModifier):
             "lstopo": "lstopo-no-graphics",
             "tund_adm_log": "tuned-adm active",
             "lsmod": "lsmod",
-            "systemctl": "systemctl -al",
-            "sysctl": "sysctl -a",
+            "systemctl": "sudo systemctl -al",
+            "sysctl": "sudo sysctl -a",
             "interrupts": "cat /proc/interrupts"}
 
     for k,v in cmds.items():

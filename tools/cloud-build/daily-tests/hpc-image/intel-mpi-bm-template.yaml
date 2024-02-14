@@ -210,12 +210,15 @@ deployment_groups:
             kill -9 `ps aux | grep git-cookie | grep -v "grep" | awk '{print $2}'`
           fi
       - type: shell
-        destination: /tmp/update_shared_dir.sh
+        destination: /tmp/setup_system.sh
         content: |
           #!/bin/bash
           if [ "${HOSTNAME##*-}" == "0" ]; then
             chmod -R a+rwX /shared
           fi
+          # Give ramble user sudo access without password
+          sed -i '/^$(vars.system_user_name)/d' /etc/sudoers
+          echo "$(vars.system_user_name) ALL=(ALL:ALL) NOPASSWD: ALL" >> /etc/sudoers
       - type: shell
         destination: /tmp/gen_hostfile.sh
         content: |
