@@ -24,10 +24,6 @@ class Ethtool(BasicModifier):
     mode('standard', description='Tests for hpc-image VM validation')
     default_mode('standard')
 
-    variable_modification('ethtool_log', '{experiment_run_dir}/ethtool_output.log', method='set', modes=['standard'])
-
-    archive_pattern('ethtool_output.log')
-
     section_list = {"S": [
         "rx_packets",
         "tx_packets",
@@ -540,14 +536,20 @@ class Ethtool(BasicModifier):
         "hsr-dup-offload"
     ]}
 
-
     for k, v in section_list.items():
-        figure_of_merit_context(f'ethtool -{k}', regex="", output_format='')
+        log_name = f'ethtool_{k}_output.log'
+        log_var = f'ethtool_{k}_log'
+        usage = f'ethtool -{k}'
+        figure_of_merit_context(usage, regex="", output_format=usage)
+        variable_modification(log_var, '{experiment_run_dir}' + f'/{log_name}', method='set', modes=['standard'])
         for section in v:
             figure_of_merit(section, fom_regex=r'\s*' + f'{section}'.replace('[', r'\[').replace(']', r'\]') + r'[:\s]+(?P<fom>.*)',
-                            group_name='fom', units='', log_file='{ethtool_log}', contexts=[f'ethtool -{k}'])
+                            group_name='fom', units='', log_file='{' + log_var + '}', contexts=[usage])
   
+    archive_pattern('ethtool_*_output.log')
     register_builtin(f'ethtool_exec', injection_method='append')
 
     def ethtool_exec(self):
-        return [f'ethtool -{k} eth0 >> ' + '{ethtool_log}' for k in self.section_list.keys()]
+        return [f'echo "ethtool -{k} >> ' + '{ethtool_log}' + 
+                f' && ethtool -{k} eth0 >> ' + 
+                '{ethtool_log}' for k in self.section_list.keys()]
