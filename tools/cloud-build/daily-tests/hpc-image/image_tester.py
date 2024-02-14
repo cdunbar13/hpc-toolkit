@@ -152,6 +152,10 @@ def send_workspace_to_bucket(deployment_name: str, zone: str, bucket_name: str) 
         tar.add("test_workspace")
     send_file_to_bucket(outfile, bucket_name)
 
+def check_for_gcloud():
+    cmd = "gcloud info"
+    run_command(cmd, "Error getting gcloud info")
+
 def build_ghpc(branch: str = "develop") -> None:
     if shutil.which("ghpc") is not None:
         print("GHPC already in the correct location, not rebuilding")
@@ -295,8 +299,7 @@ def run_tests(image_project: str, ramble_file: str, zones: List[str] = ["us-cent
     if retries is None or retries < 0 or retries > 6:
         retries = 3
 
-    cmd = "gcloud info"
-    res = run_command(cmd, "Error getting gcloud info")
+    check_for_gcloud()
     build_ghpc()
     build_network()
     if img_family is not None and cnt > 0:
@@ -352,9 +355,9 @@ if __name__ == "__main__":
                         help="Machine type to run on (default: c2-standard-60)")
     parser.add_argument("-v", "--num_vms", type=int, default=8,
                         help="Number of VMs in testing cluster (default 8)")
-    parser.add_argument("-i", "--image_names", nargs='?', const='', default=None,
+    parser.add_argument("-i", "--image_names", nargs='?', default=None,
                         help="Comma delimited list of images to test from " \
-                             "project")
+                             "the designated project (--image_project)")
     parser.add_argument("-t", "--retries", type=int, default=3,
                         help="Number of retries to attempt (default = 3, max = 6)," \
                              "used in expoential backoff (60s * (2^retry#))")
