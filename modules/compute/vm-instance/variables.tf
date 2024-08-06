@@ -223,9 +223,9 @@ variable "network_interfaces" {
   }
   validation {
     condition = alltrue([
-      for ni in var.network_interfaces : ni.nic_type == "GVNIC" || ni.nic_type == "VIRTIO_NET" || ni.nic_type == null
+      for ni in var.network_interfaces : ni.nic_type == "GVNIC" || ni.nic_type == "VIRTIO_NET" || ni.nic_type == "RDMA" || ni.nic_type == null
     ])
-    error_message = "In the variable network_interfaces, field \"nic_type\" must be either \"GVNIC\", \"VIRTIO_NET\" or null."
+    error_message = "In the variable network_interfaces, field \"nic_type\" must be either \"GVNIC\", \"VIRTIO_NET\", \"RDMA\"(private preview only), or null."
   }
   validation {
     condition = alltrue([
@@ -325,6 +325,17 @@ variable "placement_policy" {
     vm_count (number), availability_domain_count (number), collocation (string), max_distance (number).
     EOT
   }
+}
+
+variable "pre_existing_placement_policy" {
+  description = <<-EOT
+  Use a pre-existing placement policy to control where your VM instances are
+  physically located relative to each other within a zone. The value should be
+  the name of the policy.
+  EOT
+
+  type    = string
+  default = null
 }
 
 variable "spot" {
