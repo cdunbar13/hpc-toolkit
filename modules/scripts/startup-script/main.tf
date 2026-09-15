@@ -1,5 +1,5 @@
 /**
- * Copyright 2023 Google LLC
+ * Copyright 2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,6 +46,9 @@ locals {
 
   prefix_file                  = "/tmp/prefix_file.json"
   ansible_docker_settings_file = "/tmp/ansible_docker_settings.json"
+
+  # construct custom compute endpoint URL if compute version is provided
+  compute_endpoint_url = var.compute_endpoint_version != null ? "https://www.googleapis.com/compute/${var.compute_endpoint_version}/" : null
 
   docker_config    = try(jsondecode(var.docker.daemon_config), {})
   docker_data_root = try(local.docker_config.data-root, null)
@@ -100,10 +103,14 @@ locals {
       content     = <<-EOT
         #!/bin/bash
         export FI_PROVIDER="verbs;ofi_rxm"
-        export FI_OFI_RXM_USE_RNDV_WRITE=1
+        export FI_OFI_RXM_USE_RNDV_WRITE=0
         export FI_VERBS_INLINE_SIZE=39
         export I_MPI_FABRICS="shm:ofi"
-        export FI_UNIVERSE_SIZE=3072
+        export FI_UNIVERSE_SIZE=1024
+        export I_MPI_ADJUST_ALLTOALL=1
+        export I_MPI_ADJUST_IALLTOALL=1
+        export I_MPI_ADJUST_BCAST=4
+        export I_MPI_ADJUST_IBCAST=1
         EOT
     },
   ]
@@ -177,12 +184,24 @@ locals {
   ])
 
   install_ansible = coalesce(var.install_ansible, local.has_ansible_runners)
-  ansible_installer = local.install_ansible ? [{
-    type        = "shell"
-    source      = "${path.module}/files/install_ansible.sh"
-    destination = "install_ansible_automatic.sh"
-    args        = var.ansible_virtualenv_path
-  }] : []
+  ansible_installer = local.install_ansible ? [
+    {
+      type        = "file"
+      source      = "${path.module}/files/build-tools.txt"
+      destination = "build-tools.txt"
+    },
+    {
+      type        = "file"
+      source      = "${path.module}/files/install_ansible_requirements.txt"
+      destination = "install_ansible_requirements.txt"
+    },
+    {
+      type        = "shell"
+      source      = "${path.module}/files/install_ansible.sh"
+      destination = "install_ansible_automatic.sh"
+      args        = var.ansible_virtualenv_path
+    }
+  ] : []
 
   hotfix_runner = [{
     type        = "shell"
@@ -217,9 +236,11 @@ locals {
   load_runners = templatefile(
     "${path.module}/templates/startup-script-custom.tftpl",
     {
-      bucket     = local.storage_bucket_name,
-      http_proxy = var.http_proxy,
-      no_proxy   = var.http_no_proxy,
+      bucket                      = local.storage_bucket_name,
+      http_proxy                  = var.http_proxy,
+      no_proxy                    = var.http_no_proxy,
+      custom_compute_endpoint_url = local.compute_endpoint_url == null ? "" : local.compute_endpoint_url,
+      gcloud_path_override        = var.gcloud_path_override == null ? "" : var.gcloud_path_override,
       runners = [
         for runner in local.runners : {
           object      = google_storage_bucket_object.scripts[basename(runner["destination"])].output_name
@@ -276,11 +297,12 @@ resource "google_storage_bucket_iam_binding" "viewers" {
 
 resource "google_storage_bucket_object" "scripts" {
   # this writes all scripts exactly once into GCS
-  for_each = local.runners_map
-  name     = "${local.storage_folder_path_prefix}${each.key}-${substr(try(md5(each.value.content), filemd5(each.value.source)), 0, 4)}"
-  content  = each.value.content
-  source   = each.value.source
-  bucket   = local.storage_bucket_name
+  for_each       = local.runners_map
+  name           = "${local.storage_folder_path_prefix}${each.key}-${substr(try(md5(each.value.content), filemd5(each.value.source)), 0, 4)}"
+  content        = each.value.content
+  source         = each.value.source
+  source_md5hash = each.value.content != null && each.value.content != "" ? md5(each.value.content) : filemd5(each.value.source)
+  bucket         = local.storage_bucket_name
   timeouts {
     create = "10m"
     update = "10m"

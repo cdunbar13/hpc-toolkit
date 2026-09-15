@@ -1,5 +1,5 @@
 /**
-  * Copyright 2024 Google LLC
+  * Copyright 2026 Google LLC
   *
   * Licensed under the Apache License, Version 2.0 (the "License");
   * you may not use this file except in compliance with the License.
@@ -19,9 +19,10 @@ output "persistent_volume_claims" {
   value = flatten([
     for idx in range(var.pvc_count) : [{
       name          = "${local.pvc_name_prefix}-${idx}"
+      namespace     = var.namespace
       mount_path    = "${var.pv_mount_path}/${local.pvc_name_prefix}-${idx}"
       mount_options = var.mount_options
-      is_gcs        = false
+      storage_type  = local.storage_type
     }]
   ])
 }

@@ -1,4 +1,4 @@
-// Copyright 2023 Google LLC
+// Copyright 2026 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -157,12 +157,13 @@ func NewYamlCtx(data []byte) (YamlCtx, error) {
 		}
 		m[p] = Pos{posOf.Line, posOf.Column}
 
-		if n.Kind == yaml.MappingNode {
+		switch n.Kind {
+		case yaml.MappingNode:
 			for i := 0; i < len(n.Content); i += 2 {
 				// for mapping items use position of the key
 				walk(n.Content[i+1], p.Dot(n.Content[i].Value), n.Content[i])
 			}
-		} else if n.Kind == yaml.SequenceNode {
+		case yaml.SequenceNode:
 			for i, c := range n.Content {
 				walk(c, p.At(i), nil)
 			}

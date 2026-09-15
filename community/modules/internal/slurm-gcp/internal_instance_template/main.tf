@@ -1,4 +1,4 @@
-# Copyright 2024 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+module "instance_validation" {
+  source = "../../../../../modules/internal/instance_validations"
+
+  machine_type = var.machine_type
+  disk_type    = var.disk_type
+}
+
 #########
 # Locals
 #########
@@ -23,13 +30,16 @@ locals {
 
   boot_disk = [
     {
-      source_image               = var.source_image != "" ? format("${local.source_image_project}/${local.source_image}") : format("${local.source_image_project}/${local.source_image_family}")
-      disk_size_gb               = var.disk_size_gb
-      disk_type                  = var.disk_type
-      disk_labels                = var.disk_labels
-      auto_delete                = var.auto_delete
-      disk_resource_manager_tags = var.disk_resource_manager_tags
-      boot                       = "true"
+      source_image                        = var.source_image != "" ? format("${local.source_image_project}/${local.source_image}") : format("${local.source_image_project}/${local.source_image_family}")
+      disk_size_gb                        = var.disk_size_gb
+      disk_type                           = var.disk_type
+      disk_storage_pool                   = var.disk_storage_pool
+      disk_labels                         = var.disk_labels
+      auto_delete                         = var.auto_delete
+      disk_resource_manager_tags          = var.disk_resource_manager_tags
+      boot                                = "true"
+      disk_encryption_key                 = var.disk_encryption_key
+      disk_encryption_key_service_account = var.disk_encryption_key_service_account
     },
   ]
 
@@ -41,10 +51,11 @@ locals {
   # initialize the block only if it is enabled.
   shielded_vm_configs = var.enable_shielded_vm ? [true] : []
 
-  gpu_enabled            = var.gpu != null
-  alias_ip_range_enabled = var.alias_ip_range != null
-  preemptible            = var.preemptible || var.spot
-  on_host_maintenance = (
+  gpu_enabled                = var.gpu != null
+  alias_ip_range_enabled     = var.alias_ip_range != null
+  preemptible                = var.preemptible || var.spot
+  confidential_instance_type = var.enable_confidential_vm ? coalesce(var.confidential_instance_type, "SEV") : null
+  effective_on_host_maintenance = (
     local.preemptible || var.enable_confidential_vm || local.gpu_enabled
     ? "TERMINATE"
     : var.on_host_maintenance
@@ -95,6 +106,7 @@ resource "google_compute_instance_template" "tpl" {
       disk_name             = lookup(disk.value, "disk_name", null)
       disk_size_gb          = lookup(disk.value, "disk_size_gb", lookup(disk.value, "disk_type", null) == "local-ssd" ? "375" : null)
       disk_type             = lookup(disk.value, "disk_type", null)
+      storage_pool          = try(disk.value.disk_storage_pool, null) == "" ? null : try(disk.value.disk_storage_pool, null)
       interface             = lookup(disk.value, "interface", lookup(disk.value, "disk_type", null) == "local-ssd" ? "NVME" : null)
       mode                  = lookup(disk.value, "mode", null)
       source                = lookup(disk.value, "source", null)
@@ -104,9 +116,10 @@ resource "google_compute_instance_template" "tpl" {
       resource_manager_tags = lookup(disk.value, "disk_resource_manager_tags", {})
 
       dynamic "disk_encryption_key" {
-        for_each = compact([var.disk_encryption_key == null ? null : 1])
+        for_each = lookup(disk.value, "disk_encryption_key", null) != null ? [lookup(disk.value, "disk_encryption_key", null)] : (var.disk_encryption_key != null ? [var.disk_encryption_key] : [])
         content {
-          kms_key_self_link = var.disk_encryption_key
+          kms_key_self_link       = disk_encryption_key.value
+          kms_key_service_account = lookup(disk.value, "disk_encryption_key_service_account", null) != null ? lookup(disk.value, "disk_encryption_key_service_account", null) : var.disk_encryption_key_service_account
         }
       }
     }
@@ -149,6 +162,7 @@ resource "google_compute_instance_template" "tpl" {
       subnetwork_project = network_interface.value.subnetwork_project
       network_ip         = try(coalesce(network_interface.value.network_ip), null)
       nic_type           = try(coalesce(network_interface.value.nic_type), null)
+      stack_type         = try(coalesce(network_interface.value.stack_type), null)
       dynamic "access_config" {
         for_each = network_interface.value.access_config
         content {
@@ -171,13 +185,53 @@ resource "google_compute_instance_template" "tpl" {
 
   lifecycle {
     create_before_destroy = "true"
+
+    precondition {
+      condition     = !(local.confidential_instance_type == "SEV" && local.effective_on_host_maintenance == "MIGRATE") || var.min_cpu_platform == "AMD Milan"
+      error_message = "To use on_host_maintenance = 'MIGRATE' with confidential_instance_type = 'SEV', min_cpu_platform must be 'AMD Milan'."
+    }
+
+    precondition {
+      condition     = !(local.confidential_instance_type == "SEV" && var.min_cpu_platform != "AMD Milan") || local.effective_on_host_maintenance == "TERMINATE"
+      error_message = "If confidential_instance_type is 'SEV' and min_cpu_platform is not 'AMD Milan', on_host_maintenance must be 'TERMINATE'."
+    }
+
+    precondition {
+      condition     = local.confidential_instance_type != "SEV_SNP" || var.min_cpu_platform == "AMD Milan"
+      error_message = "If confidential_instance_type is 'SEV_SNP', min_cpu_platform must be 'AMD Milan'."
+    }
+
+    precondition {
+      condition     = var.enable_confidential_vm ? contains(["SEV", "SEV_SNP", "TDX"], local.confidential_instance_type) : true
+      error_message = "If enable_confidential_vm is true, confidential_instance_type must be one of 'SEV', 'SEV_SNP', or 'TDX'."
+    }
+
+    precondition {
+      condition     = var.disk_storage_pool == null || var.disk_storage_pool == "" || can(regex("^hyperdisk-", lower(var.disk_type)))
+      error_message = "Storage pools are only supported with Hyperdisks. You must specify a valid hyperdisk disk_type."
+    }
+
+    precondition {
+      condition     = var.disk_type == null || !startswith(lower(var.disk_type), "hyperdisk-") || lower(var.disk_type) == "hyperdisk-balanced"
+      error_message = "When using Hyperdisks for boot disks, only hyperdisk-balanced is supported."
+    }
+
+    precondition {
+      condition     = var.disk_type == null || lower(var.disk_type) != "hyperdisk-balanced" || var.disk_size_gb == null || tonumber(var.disk_size_gb) >= 4
+      error_message = "The minimum capacity for hyperdisk-balanced is 4 GB."
+    }
+
+    precondition {
+      condition     = length(var.additional_disks) == 0 || alltrue([for disk in var.additional_disks : disk.disk_storage_pool == null || disk.disk_storage_pool == "" || contains(["hyperdisk-balanced", "hyperdisk-throughput"], lower(try(disk.disk_type, "")))])
+      error_message = "Storage pools are only supported with Hyperdisk types (balanced or throughput)."
+    }
   }
 
   scheduling {
     preemptible                 = local.preemptible
     provisioning_model          = local.provisioning_model
     automatic_restart           = local.automatic_restart
-    on_host_maintenance         = local.on_host_maintenance
+    on_host_maintenance         = local.effective_on_host_maintenance
     instance_termination_action = var.instance_termination_action
 
     dynamic "max_run_duration" {
@@ -192,6 +246,13 @@ resource "google_compute_instance_template" "tpl" {
     for_each = var.reservation_affinity != null ? [var.reservation_affinity] : []
     content {
       type = reservation_affinity.value.type
+      dynamic "specific_reservation" {
+        for_each = try(reservation_affinity.value.specific_reservation, null) != null ? [reservation_affinity.value.specific_reservation] : []
+        content {
+          key    = specific_reservation.value.key
+          values = specific_reservation.value.values
+        }
+      }
     }
   }
 
@@ -215,6 +276,7 @@ resource "google_compute_instance_template" "tpl" {
 
   confidential_instance_config {
     enable_confidential_compute = var.enable_confidential_vm
+    confidential_instance_type  = local.confidential_instance_type
   }
 
   dynamic "guest_accelerator" {

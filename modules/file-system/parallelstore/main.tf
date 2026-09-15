@@ -1,5 +1,5 @@
 /**
- * Copyright 2024 Google LLC
+ * Copyright 2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,11 +36,13 @@ locals {
   mount_runner = {
     "type" = "shell"
     "content" = templatefile("${path.module}/templates/mount-daos.sh.tftpl", {
-      access_points     = local.access_points
-      daos_agent_config = var.daos_agent_config
-      dfuse_environment = var.dfuse_environment
-      local_mount       = var.local_mount
-      mount_options     = join(" ", [for opt in split(",", var.mount_options) : "--${opt}"])
+      access_points           = local.access_points
+      daos_agent_config       = var.daos_agent_config
+      dfuse_environment       = var.dfuse_environment
+      local_mount             = var.local_mount
+      mount_options           = join(" ", [for opt in split(",", var.mount_options) : "--${opt}"])
+      local_mount_owner       = var.local_mount_owner
+      local_mount_permissions = var.local_mount_permissions
     })
     "destination" = "mount_filesystem${replace(var.local_mount, "/", "_")}.sh"
   }

@@ -1,4 +1,4 @@
-// Copyright 2022 Google LLC
+// Copyright 2026 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,16 +18,32 @@ import (
 	"errors"
 	"fmt"
 	"hpc-toolkit/pkg/config"
+	"hpc-toolkit/pkg/dependencies"
+	"hpc-toolkit/pkg/logging"
+	"hpc-toolkit/pkg/modulereader"
 	"strings"
 
 	"github.com/zclconf/go-cty/cty"
+	"google.golang.org/api/googleapi"
 )
 
 func projectError(p string) error {
+	hint := "It is possible the machine you are working on has not been authenticated.\n"
+	if dependencies.HasBinary("gcloud") {
+		hint += "Try to run `gcloud auth application-default login`"
+	} else {
+		hint += "How to fix:\n" +
+			"1. Recommended: Install the Google Cloud SDK and authenticate.\n" +
+			"   -> Install: https://cloud.google.com/sdk/docs/install\n" +
+			"   -> Authenticate: Run `gcloud auth application-default login`\n\n" +
+			"2. Alternative: Use a Service Account Key file (Air-gapped/Minimal VMs).\n" +
+			"   -> Set the environment variable:\n" +
+			"      export GOOGLE_APPLICATION_CREDENTIALS=\"/path/to/your/key.json\""
+	}
+
 	return config.HintError{
-		Err: fmt.Errorf("project %q does not exist or your credentials do not have permission to access it", p),
-		Hint: "It is possible the machine you are working on has not been authenticated.\n" +
-			"Try to run `gcloud auth application-default login`",
+		Err:  fmt.Errorf("project %q does not exist or your credentials do not have permission to access it", p),
+		Hint: hint,
 	}
 }
 
@@ -40,9 +56,24 @@ const credentialsHint = "load application default credentials following instruct
 var ErrNoDefaultCredentials = errors.New("could not find application default credentials")
 
 func handleClientError(e error) error {
+	if e == nil {
+		return nil
+	}
 	if strings.Contains(e.Error(), "could not find default credentials") {
 		return config.HintError{Hint: credentialsHint, Err: ErrNoDefaultCredentials}
 	}
+
+	// GoogleAPI Error?
+	var gErr *googleapi.Error
+	if errors.As(e, &gErr) {
+		if gErr.Code == 403 {
+			return fmt.Errorf("GCP API permission denied or API not enabled. Check IAM roles and ensure Compute Engine API is enabled. details: %w", e)
+		}
+		if gErr.Code == 429 {
+			return fmt.Errorf("GCP API rate limit exceeded. Please wait or increase quota. details: %w", e)
+		}
+	}
+
 	return e
 }
 
@@ -54,6 +85,9 @@ const (
 	testZoneInRegionName              = "test_zone_in_region"
 	testModuleNotUsedName             = "test_module_not_used"
 	testDeploymentVariableNotUsedName = "test_deployment_variable_not_used"
+	testMachineTypeInZone             = "test_machine_type_in_zone"
+	testReservationExistsName         = "test_reservation_exists"
+	testDiskTypeInZone                = "test_disk_type_in_zone"
 )
 
 func implementations() map[string]func(config.Blueprint, config.Dict) error {
@@ -65,6 +99,10 @@ func implementations() map[string]func(config.Blueprint, config.Dict) error {
 		testZoneInRegionName:              testZoneInRegion,
 		testModuleNotUsedName:             testModuleNotUsed,
 		testDeploymentVariableNotUsedName: testDeploymentVariableNotUsed,
+		testQuotaAvailabilityName:         testQuotaAvailability,
+		testMachineTypeInZone:             testMachineTypeInZoneAvailability,
+		testReservationExistsName:         testReservationExists,
+		testDiskTypeInZone:                testDiskTypeInZoneAvailability,
 	}
 }
 
@@ -115,7 +153,48 @@ func Execute(bp config.Blueprint) error {
 			}
 		}
 	}
+
+	// Run module-metadata-based validators
+	if err := validateBlueprintWithMetadata(bp); err != nil {
+		errs.Add(err)
+	}
+
 	return errs.OrNil()
+}
+
+// validateBlueprintWithMetadata runs metadata-based validations.
+func validateBlueprintWithMetadata(bp config.Blueprint) error {
+	for _, group := range bp.Groups {
+		for j, mod := range group.Modules {
+			if mod.Kind != config.TerraformKind {
+				continue
+			}
+
+			mtd := mod.InfoOrDie().Metadata
+			if len(mtd.Ghpc.Validators) == 0 {
+				continue
+			}
+
+			for _, rule := range mtd.Ghpc.Validators {
+				validator, found := Registry[rule.Validator]
+				if !found {
+					// This could be a warning in the future if we want to allow for
+					// optional validators or validators from different versions.
+					continue
+				}
+
+				if err := validator.Validate(bp, mod, rule, group, j); err != nil {
+					// The validator is responsible for creating a BpError with the correct path.
+					if rule.Level == "warning" {
+						logging.Error("WARNING: validation failed for module %q: %v", mod.ID, err)
+						continue
+					}
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func checkInputs(inputs config.Dict, required []string) error {
@@ -178,8 +257,7 @@ func defaults(bp config.Blueprint) []config.Validator {
 		}, config.Validator{
 			Validator: testApisEnabledName,
 			Inputs:    inputs,
-		},
-		)
+		})
 	}
 
 	if projectIDExists && regionExists {
@@ -199,7 +277,34 @@ func defaults(bp config.Blueprint) []config.Validator {
 				"project_id": projectRef,
 				"zone":       zoneRef,
 			}),
+		}, config.Validator{
+			Validator: testMachineTypeInZone,
+			Inputs: config.NewDict(map[string]cty.Value{
+				"project_id": projectRef,
+				"zone":       zoneRef,
+			}),
+		}, config.Validator{
+			Validator: testDiskTypeInZone,
+			Inputs: config.NewDict(map[string]cty.Value{
+				"project_id": projectRef,
+				"zone":       zoneRef,
+			}),
 		})
+		for _, varName := range bp.Vars.Keys() {
+			if resKeyRegex.MatchString(varName) {
+				resRef := config.GlobalRef(varName).AsValue()
+
+				// Automatically add a reservation check for every detected reservation variable
+				defaults = append(defaults, config.Validator{
+					Validator: testReservationExistsName,
+					Inputs: config.NewDict(map[string]cty.Value{
+						"project_id":       projectRef,
+						"zone":             zoneRef,
+						"reservation_name": resRef,
+					}),
+				})
+			}
+		}
 	}
 
 	if projectIDExists && regionExists && zoneExists {
@@ -228,4 +333,9 @@ func validators(bp config.Blueprint) []config.Validator {
 		}
 	}
 	return vs
+}
+
+// Validator is the interface that all validation patterns must implement.
+type RuleValidator interface {
+	Validate(bp config.Blueprint, mod config.Module, rule modulereader.ValidationRule, group config.Group, modIdx int) error
 }

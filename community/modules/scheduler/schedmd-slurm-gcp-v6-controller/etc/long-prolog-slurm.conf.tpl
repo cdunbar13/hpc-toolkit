@@ -41,7 +41,7 @@ SlurmctldHost={control_host}({control_addr})
 
 
 AuthType=auth/{auth_key}
-AuthInfo=cred_expire=600
+AuthInfo=cred_expire=600,ttl=600
 AuthAltTypes=auth/jwt
 CredType=cred/{auth_key}
 MpiDefault={mpi_default}
@@ -56,7 +56,7 @@ StateSaveLocation={state_save}
 #
 # LOGGING AND ACCOUNTING
 AccountingStorageType=accounting_storage/slurmdbd
-AccountingStorageHost={control_host}
+AccountingStorageHost={accounting_storage_host}
 ClusterName={name}
 SlurmctldLogFile={slurmlog}/slurmctld.log
 SlurmdLogFile={slurmlog}/slurmd-%n.log

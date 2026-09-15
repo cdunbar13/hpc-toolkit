@@ -105,7 +105,7 @@ storage intact and b) you can build software before you deploy your cluster.
    id.
 
    ```bash
-   ./gcluster create community/examples/cae-slurm.yaml -w --vars project_id=<project>
+   ./gcluster create examples/cae/cae-slurm.yaml -w --vars project_id=<project>
    ```
 
 1. Deploy the `setup` group
@@ -113,7 +113,7 @@ storage intact and b) you can build software before you deploy your cluster.
    Call the following gcluster command to deploy the cae-slurm blueprint.
 
    ```bash
-   ./gcluster deploy cae-slurm
+   ./gcluster deploy cae-slurm-v6
    ```
 
    The next `gcluster` prompt will ask you to **display**, **apply**, **stop**, or
@@ -178,7 +178,7 @@ commands to destroy the deployment in this reverse order. You will be prompted
 to confirm the deletion of each stage.
 
 ```bash
-./gcluster destroy cae-slurm
+./gcluster destroy cae-slurm-v6
 ```
 
 > [!WARNING]
@@ -222,7 +222,7 @@ Depending on the software you want to use, different installation paths may be r
   ```
 
   where you can follow the installation steps manually. Or using the toolkit's
-  [startup-script](../../modules/scripts/startup-scripts/README.md) module, the process
+  [startup-script](../../modules/scripts/startup-script/README.md) module, the process
   can be automated.
 
   Once that is completed, the software will persist on the NFS Filestore share for as long as you

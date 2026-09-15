@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2024 "Google LLC"
+# Copyright 2026 "Google LLC"
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,4 +23,4 @@
 
 python3 -m venv env
 source env/bin/activate
-pip3 install --pre torch torchvision torchaudio
+pip3 install --require-hashes -r "$(dirname "$0")/requirements.txt"

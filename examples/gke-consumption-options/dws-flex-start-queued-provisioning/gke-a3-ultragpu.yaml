@@ -1,4 +1,4 @@
-# Copyright 2025 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,20 +22,18 @@ vars:
   region:
   zone:
   # Enable DWS Flex Start.
-  enable_flex_start:
+  enable_flex_start: true
   # Enable queued provisioning.
-  enable_queued_provisioning:
+  enable_queued_provisioning: true
   # Cidr block containing the IP of the machine calling terraform.
   # The following line must be updated for this example to work.
   authorized_cidr:
   gcp_public_cidrs_access_enabled: false
   kueue_configuration_path: $(ghpc_stage("./dws-queues.yaml.tftpl"))
-  # Temporary fix for COS issue, will be fixed in next release
-  mglru_disable_path: $(ghpc_stage("./mglru-disable.yaml"))
   # Installs NCCL library and Google NCCL plugin
   # Runs an init container on all H200 GPU nodes with the NCCL plugin image
   nccl_installer_path: $(ghpc_stage("./nccl-installer.yaml"))
-  static_gpu_count: 512
+  gpu_nominal_quota: 512
   system_node_pool_disk_size_gb: 100
   a3ultra_node_pool_disk_size_gb: 100
 
@@ -99,7 +97,7 @@ deployment_groups:
         region: $(vars.region)
 
   - id: node_pool_service_account
-    source: community/modules/project/service-account
+    source: modules/project/service-account
     settings:
       name: gke-np-sa
       project_roles:
@@ -111,7 +109,7 @@ deployment_groups:
       - artifactregistry.reader
 
   - id: workload_service_account
-    source: community/modules/project/service-account
+    source: modules/project/service-account
     settings:
       name: gke-wl-sa
       project_roles:
@@ -126,7 +124,7 @@ deployment_groups:
     source: modules/scheduler/gke-cluster
     use: [gke-a3-ultra-net-0, workload_service_account]
     settings:
-      system_node_pool_machine_type: "e2-standard-16"
+      system_node_pool_machine_type: "n2d-standard-16"
       system_node_pool_disk_size_gb: $(vars.system_node_pool_disk_size_gb)
       system_node_pool_taints: []
       enable_dcgm_monitoring: true
@@ -154,7 +152,7 @@ deployment_groups:
         ))
       # Cluster versions cannot be updated through the toolkit after creation
       # Please manage cluster version from the Google Cloud Console directly
-      version_prefix: "1.32."
+      version_prefix: "1.35."
     outputs: [instructions]
 
   - id: a3-ultragpu-pool
@@ -198,9 +196,8 @@ deployment_groups:
         install: true
         config_path: $(vars.kueue_configuration_path)
         config_template_vars:
-          num_gpus: $(vars.static_gpu_count)
+          num_gpus: $(vars.gpu_nominal_quota)
       jobset:
         install: true
       apply_manifests:
       - source: $(vars.nccl_installer_path)
-      - source: $(vars.mglru_disable_path)

@@ -1,4 +1,4 @@
-# Copyright 2024 "Google LLC"
+# Copyright 2026 "Google LLC"
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +15,18 @@
 variable "subnetwork_self_link" {
   description = "The self link of the subnetwork whose global network firewall rules will be modified."
   type        = string
+}
+
+variable "project_id" {
+  description = "The project ID to host the network in"
+  type        = string
+  default     = null
+}
+
+variable "network_name" {
+  description = "The name of the network to create firewall rules in"
+  type        = string
+  default     = null
 }
 
 variable "ingress_rules" {

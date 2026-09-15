@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023 "Google LLC"
+# Copyright 2026 "Google LLC"
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 ticker=("GOOG" "AMZN" "MSFT" "NVDA" "META" "TSLA" "PEP" "COST")
 echo "BI: $BATCH_TASK_INDEX"
 echo "TI: ${ticker[$BATCH_TASK_INDEX]}"
-python3 -m pip install -r /mnt/disks/fsi/mc_run_reqs.txt
+python3 -m pip install --require-hashes -r /mnt/disks/fsi/mc_run_reqs.txt
 python3 /mnt/disks/fsi/mc_run.py \
 	--ticker "${ticker[$BATCH_TASK_INDEX]}" \
 	--iterations 500 \

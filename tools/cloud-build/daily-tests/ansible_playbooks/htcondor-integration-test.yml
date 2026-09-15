@@ -1,4 +1,4 @@
-# Copyright 2022 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -70,7 +70,7 @@
       ansible.builtin.add_host:
         hostname: "{{ access_ip.stdout }}"
         groups: [remote_host]
-      when: access_ip.stdout | ansible.utils.ipaddr
+      when: (access_ip.stdout | default('')) | ansible.utils.ipaddr != false
     ## Setup firewall for cloud build
     - name: Create firewall rule
       register: fw_result
@@ -119,11 +119,14 @@
         - firewall-rules
         - delete
         - "{{ deployment_name }}"
+    - name: Include Failure Triage Agent trigger tasks
+      ansible.builtin.include_tasks: tasks/trigger_failure_triage_agent.yml
+
     - name: Destroy deployment
       register: gcluster_destroy
       changed_when: gcluster_destroy.changed
       ignore_errors: true
-      ansible.builtin.command: ./gcluster destroy {{ deployment_name }} --auto-approve
+      ansible.builtin.command: ./gcluster destroy {{ deployment_name }} --auto-approve --robust
       args:
         chdir: "{{ workspace }}"
       environment:
@@ -179,12 +182,15 @@
         - firewall-rules
         - delete
         - "{{ deployment_name }}"
+    - name: Include Failure Triage Agent trigger tasks
+      ansible.builtin.include_tasks: tasks/trigger_failure_triage_agent.yml
+
     - name: Destroy deployment
       delegate_to: localhost
       register: gcluster_destroy
       changed_when: gcluster_destroy.changed
       ignore_errors: true
-      ansible.builtin.command: ./gcluster destroy {{ deployment_name }} --auto-approve
+      ansible.builtin.command: ./gcluster destroy {{ deployment_name }} --auto-approve --robust
       args:
         chdir: "{{ workspace }}"
       environment:

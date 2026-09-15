@@ -1,4 +1,4 @@
-// Copyright 2023 Google LLC
+// Copyright 2026 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -138,23 +138,27 @@ func TestLabelsType(t *testing.T) {
 
 func TestNetworkStorage(t *testing.T) {
 	obj := modulereader.NormalizeType(`object({
-		server_ip             = string
-		remote_mount          = string
-		local_mount           = string
-		fs_type               = string
-		mount_options         = string
-		client_install_runner = map(string)
-		mount_runner          = map(string)
+		server_ip               = string
+		remote_mount            = string
+		local_mount             = string
+		local_mount_owner       = string
+		local_mount_permissions = string
+		fs_type                 = string
+		mount_options           = string
+		client_install_runner   = map(string)
+		mount_runner            = map(string)
 	  })`)
 	lst := modulereader.NormalizeType(fmt.Sprintf("list(%s)", obj))
 
 	// short form (without runners) is used by Slurm6
 	objShort := modulereader.NormalizeType(`object({
-		server_ip             = string
-		remote_mount          = string
-		local_mount           = string
-		fs_type               = string
-		mount_options         = string
+		server_ip               = string
+		remote_mount            = string
+		local_mount             = string
+		local_mount_owner       = string
+		local_mount_permissions = string
+		fs_type                 = string
+		mount_options           = string
 	})`)
 	lstShort := modulereader.NormalizeType(fmt.Sprintf("list(%s)", objShort))
 

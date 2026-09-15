@@ -1,5 +1,5 @@
 /**
-  * Copyright 2024 Google LLC
+  * Copyright 2026 Google LLC
   *
   * Licensed under the Apache License, Version 2.0 (the "License");
   * you may not use this file except in compliance with the License.
@@ -27,6 +27,15 @@ variable "region" {
 variable "name" {
   description = "The resource policy's name."
   type        = string
+
+  validation {
+    # Check if the variable matches the GCP resource naming regex.
+    condition     = can(regex("^[a-z]([-a-z0-9]{0,52}[a-z0-9])?$", var.name))
+    error_message = <<-EOD
+    The resource policy name must be between 1 and 54 characters, start with a lowercase letter, end with an alphanumeric, and contain only lowercase letters, numbers, and hyphens.
+    Underscores are not allowed. A shorter length is enforced to accommodate a random suffix.
+    EOD
+  }
 }
 
 variable "group_placement_max_distance" {
@@ -42,14 +51,16 @@ variable "group_placement_max_distance" {
 variable "workload_policy" {
   description = "Describes the workload policy"
   type = object({
-    type                  = optional(string, null)
-    max_topology_distance = optional(string, null)
-    accelerator_topology  = optional(string, null)
+    type                      = optional(string, null)
+    max_topology_distance     = optional(string, null)
+    accelerator_topology      = optional(string, null)
+    accelerator_topology_mode = optional(string, null)
   })
   default = {
-    type                  = null
-    max_topology_distance = null
-    accelerator_topology  = null
+    type                      = null
+    max_topology_distance     = null
+    accelerator_topology      = null
+    accelerator_topology_mode = null
   }
   nullable = false
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright 2024 Google LLC
+ * Copyright 2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -130,9 +130,33 @@ variable "capacity_gb" {
 variable "private_vpc_connection_peering" {
   description = <<-EOT
     The name of the VPC Network peering connection.
-    If using new VPC, please use community/modules/network/private-service-access to create private-service-access and
+    If using new VPC, please use modules/network/private-service-access to create private-service-access and
     If using existing VPC with private-service-access enabled, set this manually follow [user guide](https://cloud.google.com/parallelstore/docs/vpc).
     EOT
+  type        = string
+  default     = null
+}
+
+variable "namespace" {
+  description = "Kubernetes namespace to deploy the storage PVC/PV"
+  type        = string
+  default     = "default"
+}
+
+variable "enable_confidential_storage" {
+  description = "Enable Confidential Storage for this storage class."
+  type        = bool
+  default     = false
+}
+
+variable "disk_encryption_kms_key" {
+  description = "The Customer-Managed Encryption Key (CMEK) to use for disk encryption."
+  type        = string
+  default     = null
+}
+
+variable "disk_storage_pool" {
+  description = "Storage pool to use for the provisioned disks. Note that storage pools are only supported with Hyperdisk types (balanced or throughput). You must provide an existing storage pool, as this module does not create new ones."
   type        = string
   default     = null
 }

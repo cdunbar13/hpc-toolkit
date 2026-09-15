@@ -1,4 +1,4 @@
-# Copyright 2023 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,9 @@
     - deployment_name is defined
     - workspace is defined
 
+- name: Include Failure Triage Agent trigger tasks
+  ansible.builtin.include_tasks: trigger_failure_triage_agent.yml
+
 - name: Delete Firewall Rule
   register: fw_deleted
   changed_when: fw_deleted.rc == 0
@@ -30,6 +33,12 @@
     - delete
     - "{{ deployment_name }}"
 
+- name: Clean up PSA resources on failure
+  ansible.builtin.include_tasks:
+    file: cleanup_existing_psa.yml
+  vars:
+    psa_network: "{{ actual_network | default(network | default('')) }}"
+
 - name: Destroy block
   block:
 
@@ -37,7 +46,11 @@
     register: gcluster_destroy
     changed_when: gcluster_destroy.changed
     run_once: true
-    ansible.builtin.command: ./gcluster destroy {{ deployment_name }} --auto-approve
+    ansible.builtin.command: ./gcluster destroy {{ deployment_name }} --auto-approve --robust
+    # Temporarily add retry due to K8S deletion issue.
+    until: gcluster_destroy.rc == 0
+    retries: 1
+    delay: 10
     args:
       chdir: "{{ workspace }}"
     environment:

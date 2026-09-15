@@ -1,5 +1,5 @@
 /**
-  * Copyright 2023 Google LLC
+  * Copyright 2026 Google LLC
   *
   * Licensed under the Apache License, Version 2.0 (the "License");
   * you may not use this file except in compliance with the License.
@@ -22,5 +22,7 @@ labels = {
 }
 
 project_id = "invalid-project"
+
+region = "us-east4"
 
 zone = "us-east4-c"

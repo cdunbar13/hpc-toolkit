@@ -1,4 +1,4 @@
-# Copyright 2022 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +17,19 @@
 - name: "Setup Integration tests for Cluster Toolkit"
   hosts: localhost
   tasks:
+  ## Display Terraform Version
+  - name: "Get Terraform Version"
+    ansible.builtin.command: terraform version
+    changed_when: false
+    register: terraform_version_output
+
+  - name: "Print Terraform Version"
+    ansible.builtin.debug:
+      msg: |
+        ---- TERRAFORM VERSION ----
+        {{ terraform_version_output.stdout }}
+        ---------------------------
+
   ## Create SSH Keys
   - name: "Create .ssh folder"
     ansible.builtin.file:
@@ -44,8 +57,18 @@
     ansible.builtin.include_tasks:
       file: tasks/create_deployment_directory.yml
 
+  - name: Set actual_network variable
+    ansible.builtin.set_fact:
+      actual_network: "{% if use_fixed_vpc | default(false) | bool %}{{ test_prefix | default('') }}{{ test_name }}-0{% else %}{{ network }}{% endif %}"
+
   - name: Create Infrastructure and test
     block:
+    - name: Clean up any existing PSA resources from previous runs
+      ansible.builtin.include_tasks:
+        file: tasks/cleanup_existing_psa.yml
+      vars:
+        psa_network: "{{ actual_network }}"
+
     - name: Create Cluster with gcluster
       register: deployment
       changed_when: deployment.changed
@@ -107,7 +130,7 @@
         - "{{ deployment_name }}"
         - --direction=INGRESS
         - --priority=1000
-        - --network={{ network }}
+        - --network={{ actual_network }}
         - --action=ALLOW
         - --rules=tcp:22
         - --source-ranges={{ build_ip.stdout }}
@@ -130,7 +153,8 @@
       ansible.builtin.add_host:
         hostname: "{{ remote_ip }}"
         groups: [remote_host]
-      when: remote_ip | ansible.utils.ipaddr
+        actual_network: "{{ actual_network }}"
+      when: (remote_ip | default('')) | ansible.utils.ipaddr != false
 
     - name: Wait for host tasks
       ansible.builtin.include_tasks: tasks/wait-for-host.yml
@@ -181,6 +205,10 @@
       vars:
         timeout_seconds: "{{ startup_timeout_seconds }}"
 
+    - name: Add instance labels for spot instances
+      ansible.builtin.include_tasks: tasks/add-instance-labels.yml
+      when: custom_vars is defined and custom_vars.enable_spot | default(false) | bool
+
     - name: Run Integration tests for Cluster Toolkit
       ansible.builtin.include_tasks: "{{ test }}"
       vars:
@@ -190,6 +218,21 @@
       loop: "{{ post_deploy_tests }}"
       loop_control:
         loop_var: test
+
+    rescue:
+    - name: Conditionally check for spot preemptions after a failure
+      when: custom_vars is defined and custom_vars.enable_spot | default(false) | bool
+      block:
+      - name: Display test failure message
+        ansible.builtin.debug:
+          msg: "A task within the integration tests failed. Spot VMs are enabled, so running preemption checks."
+
+      - name: Check for recent preemptions
+        ansible.builtin.include_tasks: test-validation/test-preemption.yml
+
+    - name: Propagate original failure after rescue tasks
+      ansible.builtin.fail:
+        msg: "Integration tests failed. Rescue tasks were executed."
 
     always:
     - name: Cleanup firewall and infrastructure

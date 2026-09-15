@@ -1,4 +1,4 @@
-# Copyright 2024 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+module "instance_validation" {
+  source = "../../../../../modules/internal/instance_validations"
+
+  machine_type = var.machine_type
+  disk_type    = var.disk_type
+}
+
 ##########
 # LOCALS #
 ##########
@@ -19,13 +26,14 @@
 locals {
   additional_disks = [
     for disk in var.additional_disks : {
-      disk_name    = disk.disk_name
-      device_name  = disk.device_name
-      auto_delete  = disk.auto_delete
-      source       = disk.source
-      boot         = disk.boot
-      disk_size_gb = disk.disk_size_gb
-      disk_type    = disk.disk_type
+      disk_name         = disk.disk_name
+      device_name       = disk.device_name
+      auto_delete       = disk.auto_delete
+      source            = disk.source
+      boot              = disk.boot
+      disk_size_gb      = disk.disk_size_gb
+      disk_type         = disk.disk_type
+      disk_storage_pool = disk.disk_storage_pool
       disk_labels = merge(
         disk.disk_labels,
         {
@@ -33,7 +41,9 @@ locals {
           slurm_instance_role = var.slurm_instance_role
         },
       )
-      disk_resource_manager_tags = disk.disk_resource_manager_tags
+      disk_resource_manager_tags          = disk.disk_resource_manager_tags
+      disk_encryption_key                 = disk.disk_encryption_key
+      disk_encryption_key_service_account = disk.disk_encryption_key_service_account
     }
   ]
 
@@ -45,7 +55,7 @@ locals {
   source_image_family = (
     var.source_image_family != "" && var.source_image_family != null
     ? var.source_image_family
-    : "slurm-gcp-6-9-hpc-rocky-linux-8"
+    : "slurm-gcp-6-12-hpc-rocky-linux-9"
   )
   source_image_project = (
     var.source_image_project != "" && var.source_image_project != null
@@ -119,6 +129,7 @@ module "instance_template" {
   shielded_instance_config    = var.shielded_instance_config
   advanced_machine_features   = var.advanced_machine_features
   enable_confidential_vm      = var.enable_confidential_vm
+  confidential_instance_type  = var.confidential_instance_type
   enable_shielded_vm          = var.enable_shielded_vm
   preemptible                 = var.preemptible
   spot                        = var.spot
@@ -128,11 +139,11 @@ module "instance_template" {
   resource_manager_tags       = var.resource_manager_tags
 
   # Metadata
-  startup_script = data.local_file.startup.content
+  startup_script = coalesce(var.internal_startup_script, data.local_file.startup.content)
   metadata = merge(
     var.metadata,
     {
-      enable-oslogin      = upper(var.enable_oslogin)
+      enable-oslogin      = var.enable_oslogin ? "TRUE" : "FALSE"
       slurm_bucket_path   = var.slurm_bucket_path
       slurm_cluster_name  = var.slurm_cluster_name
       slurm_instance_role = var.slurm_instance_role
@@ -145,9 +156,10 @@ module "instance_template" {
   source_image         = local.source_image
 
   # Disk
-  disk_type    = var.disk_type
-  disk_size_gb = var.disk_size_gb
-  auto_delete  = var.disk_auto_delete
+  disk_type         = var.disk_type
+  disk_size_gb      = var.disk_size_gb
+  disk_storage_pool = var.disk_storage_pool
+  auto_delete       = var.disk_auto_delete
   disk_labels = merge(
     {
       slurm_cluster_name  = var.slurm_cluster_name
@@ -161,4 +173,7 @@ module "instance_template" {
   max_run_duration     = var.max_run_duration
   provisioning_model   = var.provisioning_model
   reservation_affinity = var.reservation_affinity
+
+  disk_encryption_key                 = var.disk_encryption_key
+  disk_encryption_key_service_account = var.disk_encryption_key_service_account
 }

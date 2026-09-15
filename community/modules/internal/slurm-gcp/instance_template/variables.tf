@@ -1,4 +1,4 @@
-# Copyright 2024 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -128,6 +128,7 @@ variable "additional_networks" {
     subnetwork_project = string
     network_ip         = string
     nic_type           = string
+    stack_type         = optional(string)
     access_config = list(object({
       nat_ip       = string
       network_tier = string
@@ -315,6 +316,12 @@ variable "disk_type" {
   default     = "pd-standard"
 }
 
+variable "disk_storage_pool" {
+  description = "Storage pool to use for the boot disk. Note that storage pools are only supported with Hyperdisk types. For boot disks, only hyperdisk-balanced is supported. You must provide an existing storage pool, as this module does not create new ones."
+  type        = string
+  default     = null
+}
+
 variable "disk_size_gb" {
   type        = number
   description = "Boot disk size in GB."
@@ -346,18 +353,32 @@ variable "disk_resource_manager_tags" {
     error_message = "All Resource Manager tag keys should be in the format 'tagKeys/[0-9]+'"
   }
 }
+variable "disk_encryption_key" {
+  type        = string
+  description = "The id of the encryption key that is stored in Google Cloud KMS to use to encrypt all the disks on this instance"
+  default     = null
+}
+
+variable "disk_encryption_key_service_account" {
+  type        = string
+  description = "The service account being used for the encryption request for the given KMS key. If absent, the Compute Engine default service account is used."
+  default     = null
+}
 
 variable "additional_disks" {
   type = list(object({
-    source                     = optional(string)
-    disk_name                  = optional(string)
-    device_name                = string
-    disk_type                  = optional(string)
-    disk_size_gb               = optional(number)
-    disk_labels                = map(string)
-    auto_delete                = bool
-    boot                       = bool
-    disk_resource_manager_tags = optional(map(string))
+    source                              = optional(string)
+    disk_name                           = optional(string)
+    device_name                         = string
+    disk_type                           = optional(string)
+    disk_storage_pool                   = optional(string)
+    disk_size_gb                        = optional(number)
+    disk_labels                         = map(string)
+    auto_delete                         = bool
+    boot                                = bool
+    disk_resource_manager_tags          = optional(map(string))
+    disk_encryption_key                 = optional(string)
+    disk_encryption_key_service_account = optional(string)
   }))
   description = "List of maps of disks."
   default     = []
@@ -382,8 +403,8 @@ variable "slurm_cluster_name" {
   description = "Cluster name, used for resource naming."
 
   validation {
-    condition     = can(regex("^[a-z](?:[a-z0-9]{0,9})$", var.slurm_cluster_name))
-    error_message = "Variable 'slurm_cluster_name' must be a match of regex '^[a-z](?:[a-z0-9]{0,9})$'."
+    condition     = can(regex("^[a-z]([-a-z0-9]{0,19})$", var.slurm_cluster_name))
+    error_message = "Variable 'slurm_cluster_name' must be a match of regex '^[a-z]([-a-z0-9]{0,19})$'."
   }
 }
 
@@ -419,6 +440,25 @@ variable "provisioning_model" {
 
 variable "reservation_affinity" {
   description = "Specifies the reservations that this instance can consume from."
-  type        = object({ type = string })
+  type = object({
+    type = string
+    specific_reservation = optional(object({
+      key    = string
+      values = list(string)
+    }))
+  })
+  default = null
+}
+
+
+variable "internal_startup_script" {
+  description = "FOR INTERNAL TOOLKIT USAGE ONLY."
+  type        = string
+  default     = null
+}
+
+variable "confidential_instance_type" {
+  type        = string
+  description = "The type of Confidential Computing to use (e.g., SEV, TDX). Required for some machine types like A3."
   default     = null
 }

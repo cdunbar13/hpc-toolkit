@@ -1,4 +1,4 @@
-# Copyright 2025 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,24 +22,16 @@ vars:
   zone: # supply zone
   a4h_cluster_size: # supply cluster size
   # Image settings
-  base_image:
-    project: ubuntu-os-accelerator-images
-    family: ubuntu-accelerator-2204-amd64-with-nvidia-570
-  image_build_machine_type: n2-standard-16
-  build_slurm_from_git_ref: 6.10.0
   # Cluster env settings
-  # net0 and filestore ranges must not overlap
   net0_range: 192.168.0.0/19
-  filestore_ip_range: 192.168.32.0/24
   net1_range: 192.168.64.0/18
   rdma_net_range: 192.168.128.0/18
   # Cluster Settings
   local_ssd_mountpoint: /mnt/localssd
   instance_image:
-    project: $(vars.project_id)
-    family: $(vars.deployment_name)-u22
-  disk_size_gb: 100
-  nccl_plugin_version: v1.0.5
+    project: advanced-compute-images
+    family: aci-gpu-u2404-slurm-2511-cuda-130-nvidia-580-amd64
+  disk_size_gb: 300
   benchmark_dir: $(ghpc_stage("system_benchmarks"))
   base_network_name: $(vars.deployment_name)
 
@@ -48,202 +40,21 @@ vars:
   a4h_dws_flex_enabled: false
   a4h_enable_spot_vm: false
 
+  # Managed Lustre is only supported in specific regions and zones
+  # Please refer https://cloud.google.com/managed-lustre/docs/locations
+
+  # Managed-Lustre instance name. This should be unique for each deployment.
+  lustre_instance_id: $(vars.deployment_name)-lustre
+
+  # The values of size_gib and per_unit_storage_throughput are co-related
+  # Please refer https://cloud.google.com/managed-lustre/docs/create-instance#performance-tiers
+  # Storage capacity of the lustre instance in GiB
+  lustre_size_gib: 36000
+
+  # Maximum throughput of the lustre instance in MBps per TiB
+  per_unit_storage_throughput: 500
+
 deployment_groups:
-- group: image-env
-  modules:
-  - id: slurm-image-network
-    source: modules/network/vpc
-    settings:
-      network_name: $(vars.base_network_name)-net
-
-  - id: slurm-build-script
-    source: modules/scripts/startup-script
-    settings:
-      install_ansible: true
-      docker:
-        enabled: true
-        world_writable: true
-      runners:
-      - type: data
-        destination: /etc/apt/preferences.d/block-broken-nvidia-container
-        content: |
-          Package: nvidia-container-toolkit nvidia-container-toolkit-base libnvidia-container-tools libnvidia-container1
-          Pin: version 1.17.7-1
-          Pin-Priority: 100
-      - type: shell
-        destination: disable_unattended_upgrades.sh
-        content: |
-          #!/bin/bash
-          # Unattended upgrades are disabled in this blueprint so that software does not
-          # get updated daily and lead to potential instability in the cluster environment.
-          #
-          # Unattended Upgrades installs available security updates from the Ubuntu
-          # security pocket for installed packages daily by default. Administrators who
-          # disable this feature assume all responsibility for manually reviewing and
-          # patching their systems against vulnerabilities.
-          #
-          # To enable unattended upgrades, please remove this section.
-          set -e -o pipefail
-          systemctl stop unattended-upgrades.service
-          systemctl disable unattended-upgrades.service
-          systemctl mask unattended-upgrades.service
-      - type: data
-        destination: /var/tmp/slurm_vars.json
-        content: |
-          {
-            "reboot": false,
-            "install_cuda": false,
-            "install_gcsfuse": true,
-            "install_lustre": false,
-            "install_managed_lustre": false,
-            "install_nvidia_repo": true,
-            "install_ompi": true,
-            "allow_kernel_upgrades": false,
-            "monitoring_agent": "cloud-ops",
-          }
-      - type: shell
-        destination: install_slurm.sh
-        content: |
-          #!/bin/bash
-          set -e -o pipefail
-          ansible-pull \
-              -U https://github.com/GoogleCloudPlatform/slurm-gcp -C $(vars.build_slurm_from_git_ref) \
-              -i localhost, --limit localhost --connection=local \
-              -e @/var/tmp/slurm_vars.json \
-              ansible/playbook.yml
-      # this duplicates the ulimits configuration of the HPC VM Image
-      - type: data
-        destination: /etc/security/limits.d/99-unlimited.conf
-        content: |
-          * - memlock unlimited
-          * - nproc unlimited
-          * - stack unlimited
-          * - nofile 1048576
-          * - cpu unlimited
-          * - rtprio unlimited
-      - type: ansible-local
-        destination: configure_gpu.yml
-        content: |
-          ---
-          - name: Install NVIDIA packages
-            hosts: all
-            become: true
-            vars:
-              distribution: "{{ ansible_distribution | lower }}{{ ansible_distribution_version | replace('.','') }}"
-              cuda_repo_url: https://developer.download.nvidia.com/compute/cuda/repos/{{ distribution }}/x86_64/cuda-keyring_1.1-1_all.deb
-              cuda_repo_filename: /tmp/{{ cuda_repo_url | basename }}
-              enable_nvidia_dcgm: false
-              nvidia_packages:
-              - cuda-toolkit-12-8
-              - datacenter-gpu-manager-4-cuda12
-              - libnvidia-cfg1-570-server
-              - libnvidia-nscq-570
-              - nvidia-compute-utils-570-server
-            tasks:
-            - name: Download NVIDIA repository package
-              ansible.builtin.get_url:
-                url: "{{ cuda_repo_url }}"
-                dest: "{{ cuda_repo_filename }}"
-            - name: Install NVIDIA repository package
-              ansible.builtin.apt:
-                deb: "{{ cuda_repo_filename }}"
-                state: present
-            - name: Reduce NVIDIA repository priority
-              ansible.builtin.copy:
-                dest: /etc/apt/preferences.d/cuda-repository-pin-600
-                mode: 0o0644
-                owner: root
-                group: root
-                content: |
-                  Package: nsight-compute
-                  Pin: origin *ubuntu.com*
-                  Pin-Priority: -1
-
-                  Package: nsight-systems
-                  Pin: origin *ubuntu.com*
-                  Pin-Priority: -1
-
-                  Package: *
-                  Pin: release l=NVIDIA CUDA
-                  Pin-Priority: 400
-            - name: Install NVIDIA fabric and CUDA
-              ansible.builtin.apt:
-                name: "{{ item }}"
-                update_cache: true
-              loop: "{{ nvidia_packages }}"
-            - name: Freeze NVIDIA fabric and CUDA
-              ansible.builtin.dpkg_selections:
-                name: "{{ item }}"
-                selection: hold
-              loop: "{{ nvidia_packages }}"
-            - name: Create nvidia-persistenced override directory
-              ansible.builtin.file:
-                path: /etc/systemd/system/nvidia-persistenced.service.d
-                state: directory
-                owner: root
-                group: root
-                mode: 0o755
-            - name: Configure nvidia-persistenced override
-              ansible.builtin.copy:
-                dest: /etc/systemd/system/nvidia-persistenced.service.d/persistence_mode.conf
-                owner: root
-                group: root
-                mode: 0o644
-                content: |
-                  [Service]
-                  ExecStart=
-                  ExecStart=/usr/bin/nvidia-persistenced --user nvidia-persistenced --verbose
-              notify: Reload SystemD
-            handlers:
-            - name: Reload SystemD
-              ansible.builtin.systemd:
-                daemon_reload: true
-            post_tasks:
-            - name: Disable NVIDIA DCGM by default (enable during boot on GPU nodes)
-              ansible.builtin.service:
-                name: nvidia-dcgm.service
-                state: stopped
-                enabled: false
-            - name: Disable nvidia-persistenced SystemD unit (enable during boot on GPU nodes)
-              ansible.builtin.service:
-                name: nvidia-persistenced.service
-                state: stopped
-                enabled: false
-
-      - type: ansible-local
-        destination: install_ibverbs_utils.yml
-        content: |
-          ---
-          - name: Install ibverbs-utils
-            hosts: all
-            become: true
-            tasks:
-            - name: Install Linux Modules Extra
-              ansible.builtin.package:
-                name:
-                - ibverbs-utils
-                state: present
-      - type: data
-        destination: /etc/enroot/enroot.conf
-        content: |
-          ENROOT_CONFIG_PATH     ${HOME}/.enroot
-
-
-- group: image
-  modules:
-  - id: slurm-a4high-image
-    source: modules/packer/custom-image
-    kind: packer
-    settings:
-      disk_size: $(vars.disk_size_gb)
-      machine_type: $(vars.image_build_machine_type)
-      source_image_family: $(vars.base_image.family)
-      source_image_project_id: [$(vars.base_image.project)]
-      image_family: $(vars.instance_image.family)
-      omit_external_ip: false
-    use:
-    - slurm-image-network
-    - slurm-build-script
 
 - group: cluster-env
   modules:
@@ -295,47 +106,111 @@ deployment_groups:
         ip_range: $(vars.rdma_net_range)
         region: $(vars.region)
 
+  - id: private_service_access
+    source: modules/network/private-service-access
+    use: [a4high-slurm-net-0]
+
   - id: homefs
-    source: modules/file-system/filestore
+    source: modules/file-system/managed-lustre
     use:
     - a4high-slurm-net-0
+    - private_service_access
     settings:
-      filestore_tier: HIGH_SCALE_SSD
-      size_gb: 10240
+      size_gib: $(vars.lustre_size_gib)
+      name: $(vars.lustre_instance_id)
       local_mount: /home
-      reserved_ip_range: $(vars.filestore_ip_range)
-      deletion_protection:
-        enabled: true
-        reason: Avoid data loss
+      remote_mount: lustrefs
+      per_unit_storage_throughput: $(vars.per_unit_storage_throughput)
     outputs:
     - network_storage
 
-  # - id: private_service_access
-  #   source: community/modules/network/private-service-access
-  #   use: [a4high-slurm-net-0]
+  # The following four modules create and mount a Cloud Storage Bucket with
+  # gcsfuse.  They are optional but recommended for many use cases.
+  # (Optional) The following creates a GCS bucket that will be mounted
+  # using gcsfuse. If you prefer to use a pre-existing bucket, use the
+  # modules/file-system/pre-existing-network-storage module.
+  # For more information on these flags, see
+  # https://github.com/GoogleCloudPlatform/gcsfuse/tree/master/samples/gcsfuse_config
+  - id: gcs_bucket
+    source: modules/file-system/cloud-storage-bucket
+    settings:
+      enable_hierarchical_namespace: true
+      local_mount: /gcs
+      random_suffix: true
+      mount_options: "implicit_dirs,\
+                      metadata_cache_negative_ttl_secs=0,\
+                      metadata_cache_ttl_secs=-1,\
+                      stat_cache_max_size_mb=-1,\
+                      type_cache_max_size_mb=-1,\
+                      dir_mode=777,\
+                      file_mode=777,\
+                      allow_other"
 
-  # To use Managed Lustre as for the shared /home directory:
-  # 1. Comment out the filestore block above and the`filestore_ip_range` line in the vars block.
-  # 2. Uncomment the managed-lustre and private-service-access blocks
-  # 3. Change the value for "install_managed_lustre" in /var/tmp/slurm_vars.json above to true
-  # - id: homefs
-  #   source: modules/file-system/managed-lustre
-  #   use:
-  #   - a4high-slurm-net-0
-  #   - private_service_access
-  #   settings:
-  #     size_gib: 18000
-  #     name: lustre-instance1
-  #     local_mount: /home
-  #     remote_mount: lustrefs
-  #   outputs:
-  #   - network_storage
+  # (Optional) Create a mount-point optimized for checkpoint writing/reading Uses
+  # local-ssd for and enables parallel downloads.  For more information on
+  # these flags, see
+  # https://github.com/GoogleCloudPlatform/gcsfuse/tree/master/samples/gcsfuse_config
+  # and
+  # https://docs.cloud.google.com/storage/docs/cloud-storage-fuse/profile-based-configurations
+  - id: gcs_checkpoints
+    source: modules/file-system/pre-existing-network-storage
+    settings:
+      remote_mount: $(gcs_bucket.gcs_bucket_name)
+      local_mount: /gcs-checkpoints
+      fs_type: gcsfuse
+      mount_options: "profile=aiml-checkpointing,\
+                      cache_dir=/mnt/localssd,\
+                      dir_mode=777,\
+                      file_mode=777,\
+                      allow_other"
+
+  # (Optional) Create a mount-point optimized for reading training data.
+  # For more information on these flags, see
+  # https://github.com/GoogleCloudPlatform/gcsfuse/tree/master/samples/gcsfuse_config
+  # If your training dataset fits on localssd, then you may want to enable file
+  # cache as well, which is done by adding
+  # cache-dir=/mnt/localssd,\
+  # file-cache-max-size-mb=<DATASET_SIZE>,\
+  # file-cache-cache-file-for-range-read=true,\
+  # to the mount_options.
+  # For more information on these flags, see
+  # https://github.com/GoogleCloudPlatform/gcsfuse/tree/master/samples/gcsfuse_config
+  # and
+  # https://docs.cloud.google.com/storage/docs/cloud-storage-fuse/profile-based-configurations
+  - id: gcs_training_data
+    source: modules/file-system/pre-existing-network-storage
+    settings:
+      remote_mount: $(gcs_bucket.gcs_bucket_name)
+      local_mount: /gcs-training-data
+      fs_type: gcsfuse
+      mount_options: "profile=aiml-training,\
+                      dir_mode=777,\
+                      file_mode=777,\
+                      allow_other"
+
+  # (Optional) Create a mount-point optimized for model serving.
+  # For more information on these flags, see
+  # https://github.com/GoogleCloudPlatform/gcsfuse/tree/master/samples/gcsfuse_config
+  # and
+  # https://docs.cloud.google.com/storage/docs/cloud-storage-fuse/profile-based-configurations
+  - id: gcs_model_serving
+    source: modules/file-system/pre-existing-network-storage
+    settings:
+      remote_mount: $(gcs_bucket.gcs_bucket_name)
+      local_mount: /gcs-model-serving
+      fs_type: gcsfuse
+      mount_options: "profile=aiml-serving,\
+                      cache_dir=/mnt/localssd,\
+                      dir_mode=777,\
+                      file_mode=777,\
+                      allow_other"
 
 - group: cluster
   modules:
   - id: a4high_startup
     source: modules/scripts/startup-script
     settings:
+      install_ansible: true
       local_ssd_filesystem:
         mountpoint: $(vars.local_ssd_mountpoint)
         permissions: "1777" # must quote numeric filesystem permissions!
@@ -347,6 +222,24 @@ deployment_groups:
             "data-root": "$(vars.local_ssd_mountpoint)/docker"
           }
       runners:
+      - $(gcs_checkpoints.client_install_runner)
+      - $(gcs_checkpoints.mount_runner)
+      - $(gcs_training_data.client_install_runner)
+      - $(gcs_training_data.mount_runner)
+      - $(gcs_model_serving.client_install_runner)
+      - $(gcs_model_serving.mount_runner)
+      - type: shell
+        destination: fix_enroot_env.sh
+        content: |
+          #!/bin/bash
+          # 1. Fix Ubuntu 24.04 AppArmor restriction on unprivileged user namespaces
+          if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            echo 0 > /proc/sys/kernel/apparmor_restrict_unprivileged_userns
+          fi
+          # 2. Ensure /etc/hostname exists (required by enroot-mount)
+          if [ ! -f /etc/hostname ]; then
+            hostname > /etc/hostname
+          fi
       - type: data
         destination: /etc/enroot/enroot.conf
         content: |
@@ -355,47 +248,57 @@ deployment_groups:
           ENROOT_CACHE_PATH      $(vars.local_ssd_mountpoint)/${UID}/enroot/cache
           ENROOT_DATA_PATH       $(vars.local_ssd_mountpoint)/${UID}/enroot/data
           ENROOT_TEMP_PATH       $(vars.local_ssd_mountpoint)/${UID}/enroot
+      # Install NCCL
       - type: ansible-local
-        destination: nccl_plugin.yml
+        destination: install_cuda_and_dcgm.yml
         content: |
           ---
-          - name: Install NCCL plugin for A4 High series
+          - name: Install and Configure CUDA 13 / DCGM
             hosts: all
             become: true
+            vars:
+              cuda_installer_url: "https://developer.download.nvidia.com/compute/cuda/13.0.0/local_installers/cuda_13.0.0_580.65.06_linux.run"
+              cuda_installer_file: "/tmp/cuda_13.0.0_580.65.06_linux.run"
+              nvidia_packages:
+                - datacenter-gpu-manager-4-core=1:4.6.1-1
+                - datacenter-gpu-manager-4-dev=1:4.6.1-1
+                - datacenter-gpu-manager-4-cuda13=1:4.6.1-1
             tasks:
-            - name: Add SystemD unit for NCCL plugin installation
-              ansible.builtin.copy:
-                dest: /etc/systemd/system/nccl-plugin@.service
-                mode: 0o0644
-                content: |
-                  [Unit]
-                  After=network-online.target docker.service
-                  Before=slurmd.service
-                  Requires=docker.service
+              - name: Download CUDA runfile
+                ansible.builtin.get_url:
+                  url: "{{ cuda_installer_url }}"
+                  dest: "{{ cuda_installer_file }}"
+                  mode: '0755'
 
-                  [Service]
-                  Type=oneshot
-                  ExecStartPre=/usr/bin/rm -rf /usr/local/gib
-                  ExecStartPre=/usr/bin/mkdir -p /usr/local/gib
-                  ExecStartPre=/snap/bin/gcloud auth configure-docker --quiet us-docker.pkg.dev
-                  ExecStart=/usr/bin/docker run --rm --name nccl-gib-installer --volume /usr/local/gib:/var/lib/gib \
-                      us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib:%i install --install-nccl
-                  ExecStartPost=/usr/bin/chmod -R a+r /usr/local/gib
+              - name: Install CUDA toolkit via runfile
+                ansible.builtin.command:
+                  cmd: "{{ cuda_installer_file }} --silent --toolkit"
 
-                  [Install]
-                  WantedBy=slurmd.service
-              notify:
-              - Reload SystemD
-            handlers:
-            - name: Reload SystemD
-              ansible.builtin.systemd:
-                daemon_reload: true
-            post_tasks:
-            - name: Enable NCCL plugin SystemD unit
-              ansible.builtin.service:
-                name: nccl-plugin@$(vars.nccl_plugin_version).service
-                state: started
-                enabled: true
+              - name: Remove CUDA runfile
+                ansible.builtin.file:
+                  path: "{{ cuda_installer_file }}"
+                  state: absent
+
+              - name: Install NVIDIA repository keyring
+                ansible.builtin.apt:
+                  deb: https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
+                  state: present
+
+              - name: Update apt cache
+                ansible.builtin.apt:
+                  update_cache: yes
+
+              - name: Install NVIDIA Packages
+                ansible.builtin.apt:
+                  name: "{{ nvidia_packages }}"
+                  state: present
+                  allow_downgrade: yes
+
+              - name: Freeze DCGM packages
+                ansible.builtin.dpkg_selections:
+                  name: "{{ item.split('=')[0] }}"
+                  selection: hold
+                loop: "{{ nvidia_packages }}"
       - type: ansible-local
         destination: enable_dcgm.yml
         content: |
@@ -453,13 +356,16 @@ deployment_groups:
     settings:
       bandwidth_tier: gvnic_enabled
       machine_type: a4-highgpu-8g
-      instance_image_custom: true
       enable_public_ips: true
       node_count_static: $(vars.a4h_cluster_size)
       node_count_dynamic_max: 0
       enable_placement: false
       disk_type: hyperdisk-balanced
       on_host_maintenance: TERMINATE
+      metadata:
+        user-data: |
+          #cloud-config
+          create_hostname_file: true
 
       #Provisioning models
       reservation_name: $(vars.a4h_reservation_name)
@@ -507,15 +413,32 @@ deployment_groups:
     source: community/modules/scheduler/schedmd-slurm-gcp-v6-login
     use: [a4high-slurm-net-0]
     settings:
-      instance_image_custom: true
-      disk_size_gb: 300
+      disk_size_gb: $(vars.disk_size_gb)
       enable_login_public_ips: true
-      machine_type: n2-standard-8
+      machine_type: n2d-standard-8
+      metadata:
+        user-data: |
+          #cloud-config
+          create_hostname_file: true
 
   - id: controller_startup
     source: modules/scripts/startup-script
     settings:
       runners:
+      - type: shell
+        destination: ensure_mnt_localssd_permissions.sh
+        content: |
+          #!/bin/bash
+          mkdir -p /mnt/localssd
+          chmod 1777 /mnt/localssd
+      - type: data
+        destination: /etc/enroot/enroot.conf
+        content: |
+          ENROOT_CONFIG_PATH     ${HOME}/.enroot
+          ENROOT_RUNTIME_PATH    $(vars.local_ssd_mountpoint)/${UID}/enroot/runtime
+          ENROOT_CACHE_PATH      $(vars.local_ssd_mountpoint)/${UID}/enroot/cache
+          ENROOT_DATA_PATH       $(vars.local_ssd_mountpoint)/${UID}/enroot/data
+          ENROOT_TEMP_PATH       $(vars.local_ssd_mountpoint)/${UID}/enroot
       - type: shell
         destination: stage_scripts.sh
         content: |
@@ -550,11 +473,16 @@ deployment_groups:
     - a4high_partition
     - slurm_login
     - homefs
+    - gcs_bucket
     settings:
       enable_controller_public_ips: true
-      instance_image_custom: true
       disk_type: pd-extreme
-      disk_size_gb: 300
-      machine_type: n2-standard-80
+      disk_size_gb: $(vars.disk_size_gb)
+      machine_type: n2d-standard-8
       controller_startup_script: $(controller_startup.startup_script)
       enable_external_prolog_epilog: true
+      compute_startup_scripts_timeout: 1800
+      metadata:
+        user-data: |
+          #cloud-config
+          create_hostname_file: true

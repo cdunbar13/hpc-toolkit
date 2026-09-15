@@ -1,4 +1,4 @@
-// Copyright 2022 Google LLC
+// Copyright 2026 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -200,7 +200,7 @@ func (s *MySuite) TestGetHCLInfo(c *C) {
 		c.Fatal("TestGetHCLInfo: Failed to create test directory.")
 	}
 	_, err = getHCLInfo(pathToEmptyDir)
-	c.Assert(err, ErrorMatches, "source is not a terraform or packer module: .*")
+	c.Assert(err, ErrorMatches, "source is not a terraform module: .*")
 }
 
 func (s *MySuite) TestGetInfo_TFReder(c *C) {

@@ -1,5 +1,5 @@
 /**
- * Copyright 2022 Google LLC
+ * Copyright 2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,7 +58,7 @@ variable "network_storage" {
 variable "instance_image" {
   description = <<-EOD
     Image used to build chrome remote desktop node. The default image is
-    name="debian-12-bookworm-v20250415" and project="debian-cloud".
+    name="debian-12-bookworm-v20250610" and project="debian-cloud".
     NOTE: uses fixed version of image to avoid NVIDIA driver compatibility issues.
 
     An alternative image is from name="ubuntu-2204-jammy-v20240126" and project="ubuntu-os-cloud".
@@ -71,7 +71,7 @@ variable "instance_image" {
   type        = map(string)
   default = {
     project = "debian-cloud"
-    name    = "debian-12-bookworm-v20250415"
+    name    = "debian-12-bookworm-v20250610"
   }
 }
 

@@ -1,4 +1,4 @@
-# Copyright 2024 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -154,6 +154,12 @@ variable "disk_type" {
   default     = "pd-standard"
 }
 
+variable "disk_storage_pool" {
+  description = "Storage pool to use for the boot disk. Note that storage pools are only supported with Hyperdisk types. For boot disks, only hyperdisk-balanced is supported. You must provide an existing storage pool, as this module does not create new ones."
+  type        = string
+  default     = null
+}
+
 variable "disk_labels" {
   description = "Labels to be assigned to boot disk, provided as a map"
   type        = map(string)
@@ -162,6 +168,12 @@ variable "disk_labels" {
 
 variable "disk_encryption_key" {
   description = "The id of the encryption key that is stored in Google Cloud KMS to use to encrypt all the disks on this instance"
+  type        = string
+  default     = null
+}
+
+variable "disk_encryption_key_service_account" {
+  description = "The service account being used for the encryption request for the given KMS key. If absent, the Compute Engine default service account is used."
   type        = string
   default     = null
 }
@@ -189,15 +201,18 @@ variable "disk_resource_manager_tags" {
 variable "additional_disks" {
   description = "List of maps of additional disks. See https://www.terraform.io/docs/providers/google/r/compute_instance_template#disk_name"
   type = list(object({
-    source                     = optional(string)
-    disk_name                  = optional(string)
-    device_name                = string
-    auto_delete                = bool
-    boot                       = bool
-    disk_size_gb               = optional(number)
-    disk_type                  = optional(string)
-    disk_labels                = map(string)
-    disk_resource_manager_tags = map(string)
+    source                              = optional(string)
+    disk_name                           = optional(string)
+    device_name                         = string
+    auto_delete                         = bool
+    boot                                = bool
+    disk_size_gb                        = optional(number)
+    disk_type                           = optional(string)
+    disk_storage_pool                   = optional(string)
+    disk_labels                         = map(string)
+    disk_resource_manager_tags          = map(string)
+    disk_encryption_key                 = optional(string)
+    disk_encryption_key_service_account = optional(string)
   }))
   default = []
 }
@@ -250,6 +265,7 @@ variable "additional_networks" {
     subnetwork_project = string
     network_ip         = string
     nic_type           = string
+    stack_type         = optional(string)
     access_config = list(object({
       nat_ip       = string
       network_tier = string
@@ -393,6 +409,18 @@ variable "provisioning_model" {
 
 variable "reservation_affinity" {
   description = "Specifies the reservations that this instance can consume from."
-  type        = object({ type = string })
+  type = object({
+    type = string
+    specific_reservation = optional(object({
+      key    = string
+      values = list(string)
+    }))
+  })
+  default = null
+}
+
+variable "confidential_instance_type" {
+  type        = string
+  description = "The type of Confidential Computing to use (e.g., SEV, TDX). Required for some machine types like A3."
   default     = null
 }

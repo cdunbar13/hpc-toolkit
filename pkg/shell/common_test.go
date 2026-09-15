@@ -1,5 +1,5 @@
 /*
-Copyright 2023 Google LLC
+Copyright 2026 Google LLC
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -119,4 +119,50 @@ func (s *MySuite) TestValidateDeploymentDirectory(c *C) {
 	// do fail if missing directories
 	os.Remove(filepath.Join(dir, string(groups[0].Name)))
 	c.Assert(ValidateDeploymentDirectory(groups, dir), NotNil)
+}
+
+func (s *MySuite) TestRandomString(c *C) {
+	res, err := RandomString(10)
+	c.Assert(err, IsNil)
+	c.Assert(len(res), Equals, 10)
+
+	res2, err := RandomString(10)
+	c.Assert(err, IsNil)
+	c.Assert(res, Not(Equals), res2)
+}
+
+func (s *MySuite) TestAskForConfirmation_Yes(c *C) {
+	pipeRead, pipeWrite, err := os.Pipe()
+	c.Assert(err, IsNil)
+	defer pipeRead.Close()
+	defer pipeWrite.Close()
+
+	origStdin := os.Stdin
+	os.Stdin = pipeRead
+	defer func() { os.Stdin = origStdin }()
+
+	if _, err := pipeWrite.Write([]byte("y\n")); err != nil {
+		c.Fatal(err)
+	}
+
+	got := PromptYesNo("Test prompt")
+	c.Assert(got, Equals, true)
+}
+
+func (s *MySuite) TestAskForConfirmation_No(c *C) {
+	pipeRead, pipeWrite, err := os.Pipe()
+	c.Assert(err, IsNil)
+	defer pipeRead.Close()
+	defer pipeWrite.Close()
+
+	origStdin := os.Stdin
+	os.Stdin = pipeRead
+	defer func() { os.Stdin = origStdin }()
+
+	if _, err := pipeWrite.Write([]byte("n\n")); err != nil {
+		c.Fatal(err)
+	}
+
+	got := PromptYesNo("Test prompt")
+	c.Assert(got, Equals, false)
 }

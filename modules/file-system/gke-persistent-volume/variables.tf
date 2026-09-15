@@ -1,5 +1,5 @@
 /**
- * Copyright 2023 Google LLC
+ * Copyright 2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,13 +45,26 @@ variable "filestore_id" {
   }
 }
 
+variable "lustre_id" {
+  description = "An identifier for a lustre with the format `projects/{{project}}/locations/{{location}}/instances/{{name}}`."
+  type        = string
+  default     = null
+  validation {
+    condition = (
+      var.lustre_id == null ||
+      try(length(split("/", var.lustre_id)), 0) == 6
+    )
+    error_message = "lustre_id must be in the format of 'projects/{{project}}/locations/{{location}}/instances/{{name}}'."
+  }
+}
+
 variable "gcs_bucket_name" {
   description = "The gcs bucket to be used with the persistent volume."
   type        = string
   default     = null
 }
 
-variable "capacity_gb" {
+variable "capacity_gib" {
   description = "The storage capacity with which to create the persistent volume."
   type        = number
 }
@@ -59,4 +72,44 @@ variable "capacity_gb" {
 variable "labels" {
   description = "GCE resource labels to be applied to resources. Key-value pairs."
   type        = map(string)
+}
+
+variable "namespace" {
+  description = "Kubernetes namespace to deploy the storage PVC/PV"
+  type        = string
+  default     = "default"
+}
+
+variable "pv_name" {
+  description = "The name for PV. IF not set, a name will be generated based on the storage name."
+  type        = string
+  default     = null
+}
+
+variable "pvc_name" {
+  description = "The name for PVC. IF not set, a name will be generated based on the storage name."
+  type        = string
+  default     = null
+}
+
+variable "gcsfuse_storage_class_name" {
+  description = "The storage class name for GCS Fuse. Allowed values: gcsfusecsi-training, gcsfusecsi-serving, gcsfusecsi-checkpointing."
+  type        = string
+  default     = null
+  validation {
+    condition     = var.gcsfuse_storage_class_name == null || contains(["gcsfusecsi-training", "gcsfusecsi-serving", "gcsfusecsi-checkpointing"], var.gcsfuse_storage_class_name)
+    error_message = "gcsfuse_storage_class_name must be one of gcsfusecsi-training, gcsfusecsi-serving, gcsfusecsi-checkpointing."
+  }
+}
+
+variable "grant_gcsfuse_service_agent_role" {
+  description = "Whether to grant the GCS Fuse service agent role to the GKE robot service account on the bucket when using a GCS Fuse storage profile."
+  type        = bool
+  default     = true
+}
+
+variable "gcsfuse_service_agent_role" {
+  description = "The IAM role to grant to the GKE Service Agent on the bucket for GCSFuse Storage Profiles. Defaults to built-in 'roles/storage.admin' which covers all required permissions (storage.buckets.get, storage.objects.list, and storage.anywhereCaches.*) for zero-friction deployment without custom roles. Can be set to a custom role (e.g. 'projects/<cluster_project_id>/roles/gke.gcsfuse.profileUser') for strict least-privilege compliance."
+  type        = string
+  default     = "roles/storage.admin"
 }

@@ -6,6 +6,35 @@ see:
 
 [Create an AI-optimized Slurm cluster](https://cloud.google.com/ai-hypercomputer/docs/create/create-slurm-cluster)
 
+Selective deployment and teardown for this blueprint are documented centrally. See [examples/machine-learning/README.md](../README.md) for full details.
+
+### Additional ways to provision
+Cluster toolkit also supports DWS Flex-Start, Spot VMs, as well as reservations as ways to provision instances.
+
+[For more information on DWS Flex-Start in Slurm](https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/main/docs/slurm-dws-flex.md)
+[For more information on Spot VMs](https://cloud.google.com/compute/docs/instances/spot)
+
+To use one of these alternative models, modify the `vars` section in the `a4high-slurm-deployment.yaml` file.
+Replace the line defining `a4h_reservation_name` with one of the following:
+
+* `a4h_enable_spot_vm: true` (for Spot VMs)
+* `a4h_dws_flex_enabled: true` (for DWS Flex-Start)
+
+### Cloud Storage FUSE
+
+This blueprint includes four Cloud Storage FUSE mounts to provide a simple and scalable way
+to manage data.
+
+1. `/gcs` is a general purpose mount that can be used for shared tools and data.
+1. `/gcs-checkpoints` is an optimized mount for writing and reading checkpoints. It
+    uses the local SSD for caching and enables parallel downloads to improve
+    performance.
+1. `/gcs-training-data` is an optimized mount for reading training data. It can
+   be further tuned if the training data fits fully within the local ssd
+   storage.
+1. `/gcs-model-serving` is an optimized mount for serving models, which
+   downloads model weights in parallel to local ssd.
+
 ## A4-High VMs
 
 ### Build the Cluster Toolkit gcluster binary
@@ -61,20 +90,30 @@ vars:
 ```
 
 ### Additional ways to provision
-Cluster toolkit also supports DWS Flex-Start, Spot VMs, as well as reservations as ways to provision instances.
-
-[For more information on DWS Flex-Start in Slurm](https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/main/docs/slurm-dws-flex.md)
+Cluster toolkit also supports  Spot VMs as well as reservations as ways to provision instances.
 [For more information on Spot VMs](https://cloud.google.com/compute/docs/instances/spot)
 
-We provide ways to enable the alternative provisioning models in the `a4high-slurm-deployment.yaml` file.
+To use one of these alternative models, modify the `vars` section in the `a4high-vm-deployment.yaml` file
+Replace the line defining `a4h_reservation_name` with one of the following:
 
-To make use of these other models, replace `a4h_reservation_name` in the deployment file with the variable of choice below.
+* `a4h_provisioning_model: SPOT`
 
-`a4h_enable_spot_vm: true` for spot or `a4h_dws_flex_enabled: true` for DWS Flex-Start.
+and update `automatic_restart` policy to false in the `a4high-vm.yaml` file.
 
 ### Deploy the VMs
 
 ```bash
 #!/bin/bash
-./gcluster deploy -d a4high-vm-deployment.yaml a4high-vm.yaml --auto-approve
+./gcluster deploy -d examples/machine-learning/a4-highgpu-8g/a4high-vm-deployment.yaml examples/machine-learning/a4-highgpu-8g/a4high-vm.yaml --auto-approve
 ```
+
+## Clean Up
+To destroy all resources created by the blueprint, run the following command:
+
+```sh
+./gcluster destroy DEPLOYMENT_NAME
+```
+
+Replace `DEPLOYMENT_NAME` with the `deployment_name` you specified in your deployment file.
+
+**Note:** GCS buckets created for Terraform state are not deleted by the `./gcluster destroy` command and must be deleted manually.

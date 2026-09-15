@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2025 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ trap "printf '\nCaught Ctrl+c. Exiting...\n'; exit" INT
 # for jobs submitted
 TAG=$(date +%s)
 TEST_DIR=${PWD}/nccl-tests-"${TAG}"
-SOFTWARE_INSTALL=/opt/apps
+SOFTWARE_INSTALL=${1:-/opt/apps}
 
 cat <<EOF
 This script will install the following packages using on this VM:
@@ -32,7 +32,7 @@ by adding the following to ${HOME}/.enroot/.credentials:
 
   machine us-docker.pkg.dev login oauth2accesstoken password \$(gcloud auth print-access-token)
 
-And will clone ramble (https://github.com/GoogleCloudPlatform/ramble.git)
+And will clone ramble (https://github.com/Ramble-Project/ramble.git)
 to "${SOFTWARE_INSTALL}"/, and it will create an enroot "sqsh" file located
 in your ${HOME}/.enroot/ folder. Afterwards it will create a ramble workspace
 to run a number of NCCL tests in $(readlink -f "${TEST_DIR}"/).
@@ -44,7 +44,26 @@ read -t 30 -rp "To continue, hit [enter]. To cancel, type [Ctrl-c]. Will auto-co
 mkdir -p "${TEST_DIR}"
 
 # Install prerequisites
-sudo apt-get install -y python3-venv jq
+# Handle Munge service conflict
+MUNGE_ACTIVE=false
+if systemctl is-active --quiet munge; then
+	MUNGE_ACTIVE=true
+	echo "Stopping Munge to prevent package lock..."
+	sudo systemctl stop munge || true
+fi
+
+# Non-interactive installation
+echo "Installing prerequisites..."
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+	-o Dpkg::Options::="--force-confdef" \
+	-o Dpkg::Options::="--force-confold" \
+	python3-venv jq
+
+# Restart Munge if it was active
+if [ "$MUNGE_ACTIVE" = true ]; then
+	echo "Restarting Munge..."
+	sudo systemctl start munge || true
+fi
 
 # Create enroot credentials set up for artifact registry
 mkdir -p "${HOME}"/.enroot/
@@ -58,7 +77,8 @@ EOF
 fi
 
 # Install ramble and make world read/writeable.
-sudo git clone --depth 1 -c feature.manyFiles=true https://github.com/GoogleCloudPlatform/ramble.git "${SOFTWARE_INSTALL}"/ramble || true
+sudo git clone -c feature.manyFiles=true https://github.com/Ramble-Project/ramble.git "${SOFTWARE_INSTALL}"/ramble || true
+sudo git -C "${SOFTWARE_INSTALL}"/ramble checkout 2a020babedd68be15448f3893d2a245fcaa8bd73
 sudo chmod -R a+w "${SOFTWARE_INSTALL}"/ramble
 
 # Create python environment for ramble, and install requirements
@@ -67,7 +87,7 @@ source "${SOFTWARE_INSTALL}"/ramble/env/bin/activate
 pip install -q -r "${SOFTWARE_INSTALL}"/ramble/requirements.txt
 
 # Activate ramble
-. ${SOFTWARE_INSTALL}/ramble/share/ramble/setup-env.sh
+. "${SOFTWARE_INSTALL}"/ramble/share/ramble/setup-env.sh
 
 # Create a new workspace for this work
 ramble workspace create -a -d "${TEST_DIR}"
@@ -76,6 +96,8 @@ ramble workspace create -a -d "${TEST_DIR}"
 cat <<EOF >"${TEST_DIR}"/configs/ramble.yaml
 # Ramble Configuration for NCCL Tests
 ramble:
+  config:
+    overwrite_inventories: true
   modifiers:
   - name: pyxis-enroot
   - name: nccl-gib
@@ -96,9 +118,9 @@ ramble:
 
     hostlist: \${SLURM_JOB_NODELIST}
 
-    container_dir: "/opt/apps/ramble/sqsh"
-    container_name: nccl-plugin-gib-diagnostic-v1.0.5
-    container_uri: docker://us-docker.pkg.dev#gce-ai-infra/gpudirect-gib/nccl-plugin-gib-diagnostic:v1.0.5
+    container_dir: "${SOFTWARE_INSTALL}/ramble/sqsh"
+    container_name: nccl-plugin-gib-diagnostic-v1.1.2
+    container_uri: docker://us-docker.pkg.dev#gce-ai-infra/gpudirect-gib/nccl-plugin-gib-diagnostic:v1.1.2
     processes_per_node: 8
     processes_per_node: '{gpus_per_node}'
     gpus_per_node: '8'

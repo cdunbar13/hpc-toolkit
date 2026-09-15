@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2024 "Google LLC"
+# Copyright 2026 "Google LLC"
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -99,4 +99,4 @@ srun --mpi=pmi2 \
 	--container-image="${CONTAINER_IMAGE}" \
 	--container-env="${HOST_VARS}" \
 	--container-mounts="${CONTAINER_MOUNTS}" \
-	/nccl/nccl-tests/build/all_reduce_perf -b 1G -e 8G -f 2 -g 1 -w 5 --iters 40 -c 0
+	/nccl/nccl-tests/build/all_reduce_perf -b 1G -e 8G -f 2 -g 1 -w 5 --iters 40

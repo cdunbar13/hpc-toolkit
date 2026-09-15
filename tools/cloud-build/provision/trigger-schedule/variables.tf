@@ -1,4 +1,4 @@
-# Copyright 2023 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,6 +24,12 @@ variable "trigger" {
 variable "schedule" {
   description = "Describes the schedule on which the job will be executed."
   type        = string
+}
+
+variable "time_zone" {
+  description = "Specifies the time zone to be used in interpreting schedule."
+  type        = string
+  default     = "Asia/Kolkata"
 }
 
 variable "retry_count" {

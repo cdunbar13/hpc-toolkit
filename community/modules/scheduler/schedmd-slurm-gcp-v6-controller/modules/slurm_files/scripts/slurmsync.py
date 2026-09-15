@@ -21,6 +21,7 @@ import logging
 import re
 import sys
 import shlex
+import subprocess
 from datetime import datetime, timedelta
 from itertools import chain
 from pathlib import Path
@@ -43,10 +44,11 @@ from util import (
     dirs,
 )
 from util import lookup
-from suspend import delete_instances
+from suspend import suspend_nodes
 import tpu
 import conf
 import watch_delete_vm_op
+import repair
 
 log = logging.getLogger()
 
@@ -81,12 +83,21 @@ class NodeActionPowerDown():
         log.info(f"{len(nodes)} instances to power down ({hostlist})")
         run(f"{lookup().scontrol} update nodename={hostlist} state=power_down")
 
+
+@dataclass(frozen=True)
+class NodeActionPowerDownForce():
+    def apply(self, nodes:List[str]) -> None:
+        hostlist = util.to_hostlist(nodes)
+        log.info(f"{len(nodes)} instances to power down ({hostlist})")
+        run(f"{lookup().scontrol} update nodename={hostlist} state=power_down_force")
+
+
 @dataclass(frozen=True)
 class NodeActionDelete():
     def apply(self, nodes:List[str]) -> None:
         hostlist = util.to_hostlist(nodes)
         log.info(f"{len(nodes)} instances to delete ({hostlist})")
-        delete_instances(nodes)
+        suspend_nodes(nodes)
 
 @dataclass(frozen=True)
 class NodeActionPrempt():
@@ -111,6 +122,17 @@ class NodeActionDown():
         run(f"{lookup().scontrol} update nodename={hostlist} state=down reason={shlex.quote(self.reason)}")
 
 @dataclass(frozen=True)
+class NodeActionRepair():
+    reason: str
+    def apply(self, nodes: List[str]) -> None:
+        hostlist = util.to_hostlist(nodes)
+        log.info(f"{len(nodes)} nodes to repair ({hostlist}) with reason={self.reason}")
+        for node in nodes:
+            op_id = repair.call_rr_api(node, self.reason)
+            if op_id:
+                repair.store_operation(node, op_id, self.reason)
+
+@dataclass(frozen=True)
 class NodeActionUnknown():
     slurm_state: Optional[NodeState]
     instance_state: Optional[str]
@@ -126,7 +148,7 @@ def start_instance_op(node: str) -> Any:
     return lookup().compute.instances().start(
         project=lookup().project,
         zone=inst.zone,
-        instance=inst,
+        instance=inst.name,
     )
 
 
@@ -228,10 +250,34 @@ def _find_tpu_node_action(nodename, state) -> NodeAction:
 
     return NodeActionUnchanged()
 
+def get_node_reason(nodename: str) -> Optional[str]:
+    """Get the reason for a node's state using JSON output."""
+    try:
+        # Use --json to get structured data
+        result = run(f"{lookup().scontrol} show node {nodename} --json")
+        data = json.loads(result.stdout)
+
+        # Access the reason field directly from the JSON structure
+        nodes = data.get('nodes', [])
+        if nodes:
+            reason = nodes[0].get('reason')
+            # Handle the specific formatting logic for brackets if needed
+            if reason and "[" in reason:
+                return reason.split("[")[0].strip()
+            return reason
+    except (subprocess.CalledProcessError, json.JSONDecodeError) as e:
+        log.error(f"Failed to execute scontrol or parse its JSON output for node {nodename}: {e}")
+    except Exception as e:
+        log.error(f"An unexpected error occurred while getting reason for node {nodename}: {e}")
+    return None
+
+
 def get_node_action(nodename: str) -> NodeAction:
     """Determine node/instance status that requires action"""
     lkp = lookup()
     state = lkp.node_state(nodename)
+    if lkp.node_is_gke(nodename):
+        return NodeActionUnchanged()
 
     if lkp.node_is_fr(nodename):
         fr = lkp.future_reservation(lkp.node_nodeset(nodename))
@@ -246,10 +292,36 @@ def get_node_action(nodename: str) -> NodeAction:
         return _find_tpu_node_action(nodename, state)
 
     # split below is workaround for VMs whose hostname is FQDN
-    inst = lkp.instance(nodename.split(".")[0])
+    short_nodename = nodename.split(".")[0]
+    inst = lkp.instance(short_nodename)
+
+    # For MIG compute nodes, detect active GCE Auto-Healing repairs
+    if lkp.is_node_mig(nodename):
+        try:
+            mig_name = lkp.node_mig_name(nodename)
+            region = lkp.node_region(nodename)
+            if short_nodename in lkp.get_mig_repairing_instances(lkp.project, region, mig_name):
+                if state is not None and state.base != "DOWN":
+                    return NodeActionDown(reason="MIG Auto-Healing instance repair in progress")
+                return NodeActionUnchanged()
+            elif inst and inst.status == "RUNNING" and state is not None and state.base == "DOWN":
+                if "MIG Auto-Healing" in (get_node_reason(short_nodename) or ""):
+                    log.info(f"{short_nodename} recovered by MIG auto-healing; resuming node to idle")
+                    return NodeActionIdle()
+        except Exception as e:
+            log.debug(f"Failed to check managed instance repair status for {nodename}: {e}")
+
     power_flags = frozenset(
         ("POWER_DOWN", "POWERING_UP", "POWERING_DOWN", "POWERED_DOWN")
     ) & (state.flags if state is not None else set())
+
+    if state is not None and "DRAIN" in state.flags:
+        reason = get_node_reason(nodename)
+        if reason in repair.REPAIR_REASONS:
+            if repair.is_node_being_repaired(nodename):
+                return NodeActionUnchanged()
+            if inst:
+                return NodeActionRepair(reason=reason)
 
     if (state is None) and (inst is None):
         # Should never happen
@@ -267,6 +339,8 @@ def get_node_action(nodename: str) -> NodeAction:
         if state.base != "DOWN" and not power_flags:
             return NodeActionDown(reason="Unbacked instance")
         if state.base == "DOWN" and not power_flags:
+            return NodeActionPowerDown()
+        if "NOT_RESPONDING" in state.flags:
             return NodeActionPowerDown()
         if "POWERED_DOWN" in state.flags and lkp.is_static_node(nodename):
             return NodeActionPowerUp()
@@ -292,7 +366,11 @@ def get_node_action(nodename: str) -> NodeAction:
     elif state is None:
         # if state is None here, the instance exists but it's not in Slurm
         return NodeActionUnknown(slurm_state=state, instance_state=inst.status)
-
+    elif lkp.is_flex_node(nodename) and "POWERING_UP" in state.flags:
+        threshold = timedelta(seconds=int(lkp.cfg.compute_startup_scripts_timeout) * 2) #extra buffer for unexpectedly long startup scripts
+        if util.now() - inst.creation_timestamp > threshold:
+            log.info(f"{nodename} was unable to join the cluster after {threshold.seconds}s, potential failure on VM startup. Powering down...")
+            return NodeActionPowerDownForce()
     return NodeActionUnchanged()
 
 
@@ -393,6 +471,7 @@ def sync_instances():
 
 def reconfigure_slurm():
     update_msg = "*** slurm configuration was updated ***"
+
     if lookup().cfg.hybrid:
         # terraform handles generating the config.yaml, don't do it here
         return
@@ -405,7 +484,8 @@ def reconfigure_slurm():
     util.update_config(cfg_new)
 
     if lookup().is_controller:
-        conf.gen_controller_configs(lookup())
+        conf.get_generator(lookup()).generate_configs()
+
         log.info("Restarting slurmctld to make changes take effect.")
         try:
             # TODO: consider removing "restart" since "reconfigure" should restart slurmctld as well
@@ -427,10 +507,12 @@ def reconfigure_slurm():
         log.debug("Done.")
 
 
+def _generate_topology(lkp: util.Lookup) -> Tuple[bool, Any]:
+    return conf.get_generator(lkp).generate_topology_data()
+
 def update_topology(lkp: util.Lookup) -> None:
-    if conf.topology_plugin(lkp) != conf.TOPOLOGY_PLUGIN_TREE:
-        return
-    updated, summary = conf.gen_topology_conf(lkp)
+    updated, summary = _generate_topology(lkp) # type: ignore[attr-defined]
+
     if updated:
         log.info("Topology configuration updated. Reconfiguring Slurm.")
         util.scontrol_reconfigure(lkp)
@@ -595,12 +677,13 @@ def process_messages(lkp: util.Lookup) -> None:
 
 
 def main():
+    lkp = lookup()
+    if util.should_mount_slurm_bucket() and not lkp.is_controller:
+        return
     try:
         reconfigure_slurm()
     except Exception:
         log.exception("failed to reconfigure slurm")
-
-    lkp = lookup()
     if lkp.is_controller:
         try:
             process_messages(lkp)
@@ -611,6 +694,11 @@ def main():
             sync_instances()
         except Exception:
             log.exception("failed to sync instances")
+
+        try:
+            repair.poll_operations()
+        except Exception:
+            log.exception("failed to poll repair operations")
 
         try:
             sync_flex_migs(lkp)

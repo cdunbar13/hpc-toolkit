@@ -1,5 +1,5 @@
 /**
-  * Copyright 2023 Google LLC
+  * Copyright 2026 Google LLC
   *
   * Licensed under the Apache License, Version 2.0 (the "License");
   * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ terraform {
 }
 
 module "network0" {
-  source          = "./modules/embedded/modules/network/vpc"
+  source          = "../_modules/embedded/modules/network/vpc"
   deployment_name = var.deployment_name
   labels          = var.labels
   project_id      = var.project_id

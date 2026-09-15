@@ -1,4 +1,4 @@
-// Copyright 2024 "Google LLC"
+// Copyright 2026 "Google LLC"
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -96,6 +96,11 @@ func addJsonOutputFlag(c *cobra.Command) *cobra.Command {
 	return c
 }
 
+func addGkeVulnerabilitiesCheckFlag(c *cobra.Command) *cobra.Command {
+	c.Flags().Bool("skip-gke-security-check", false, "Bypass dynamic GKE version security vulnerability check")
+	return c
+}
+
 var flagSkipGroups []string
 var flagOnlyGroups []string
 
@@ -132,4 +137,13 @@ func isGroupSelected(g config.GroupName) bool {
 		return !slices.Contains(flagSkipGroups, string(g))
 	}
 	return true
+}
+
+func hasSelectedGroupOfKind(bp config.Blueprint, kind config.ModuleKind) bool {
+	for _, g := range bp.Groups {
+		if isGroupSelected(g.Name) && g.Kind() == kind {
+			return true
+		}
+	}
+	return false
 }

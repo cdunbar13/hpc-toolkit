@@ -1,4 +1,4 @@
-# Copyright 2025 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ module "login" {
 
   login_nodes = each.value
 
-  startup_scripts         = local.login_startup_scripts
+  startup_scripts         = concat(local.login_startup_scripts, each.value.startup_script)
   startup_scripts_timeout = var.login_startup_scripts_timeout
 
   network_storage = var.login_network_storage
@@ -46,5 +46,5 @@ module "login" {
 
   # trigger replacement of login nodes when the controller instance is replaced
   # Needed for re-mounting volumes hosted on controller
-  replace_trigger = google_compute_instance_from_template.controller.self_link
+  replace_trigger = var.enable_backup_controller ? module.slurm_controller_template.self_link : one(google_compute_instance_from_template.controller[*].self_link)
 }

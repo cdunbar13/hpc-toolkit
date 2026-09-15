@@ -1,4 +1,4 @@
-# Copyright 2023 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,11 +31,6 @@ output "partitions" {
     # turn off "power management" at nodeset level (can only do it at partition or node level).
     condition     = sum([for b in [local.has_node, local.has_dyn, local.has_tpu] : b ? 1 : 0]) == 1
     error_message = "Partition must contain exactly one type of nodeset."
-  }
-
-  precondition {
-    condition     = !local.uses_job_duration || var.exclusive
-    error_message = "`use_job_duration` can only be used in exclusive partitions"
   }
 }
 

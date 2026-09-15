@@ -1,5 +1,5 @@
 /**
- * Copyright 2024 Google LLC
+ * Copyright 2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,13 +24,15 @@ locals {
 output "network_storage" {
   description = "Describes a parallelstore instance."
   value = {
-    server_ip             = local.server_ip
-    remote_mount          = local.remote_mount
-    local_mount           = var.local_mount
-    fs_type               = local.fs_type
-    mount_options         = var.mount_options
-    client_install_runner = local.client_install_runner
-    mount_runner          = local.mount_runner
+    server_ip               = local.server_ip
+    remote_mount            = local.remote_mount
+    local_mount             = var.local_mount
+    local_mount_owner       = var.local_mount_owner
+    local_mount_permissions = var.local_mount_permissions
+    fs_type                 = local.fs_type
+    mount_options           = var.mount_options
+    client_install_runner   = local.client_install_runner
+    mount_runner            = local.mount_runner
   }
 
   precondition {

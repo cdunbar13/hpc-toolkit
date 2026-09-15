@@ -1,4 +1,4 @@
-# Copyright 2023 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,8 +13,7 @@
 # limitations under the License.
 
 locals {
-  use_static        = [for ns in concat(var.nodeset, var.nodeset_tpu) : ns.nodeset_name if ns.node_count_static > 0]
-  uses_job_duration = length([for ns in var.nodeset : ns.dws_flex.use_job_duration if ns.dws_flex.use_job_duration]) > 0
+  use_static = [for ns in concat(var.nodeset, var.nodeset_tpu) : ns.nodeset_name if ns.node_count_static > 0]
 
   has_node = length(var.nodeset) > 0
   has_dyn  = length(var.nodeset_dyn) > 0

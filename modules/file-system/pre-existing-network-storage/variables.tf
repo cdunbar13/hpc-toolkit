@@ -1,5 +1,5 @@
 /**
- * Copyright 2022 Google LLC
+ * Copyright 2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,30 @@ variable "local_mount" {
   description = "The mount point where the contents of the device may be accessed after mounting."
   type        = string
   default     = "/mnt"
+}
+
+variable "local_mount_owner" {
+  description = "Local mount owner, string in format <user>:<group>. Defaults to root:root."
+  type        = string
+  default     = ""
+  nullable    = false
+  validation {
+    condition     = var.local_mount_owner == "" || length(split(":", var.local_mount_owner)) == 2
+    error_message = "Provide owner as <user>:<group>."
+  }
+  validation {
+    condition = var.local_mount_owner == "" || alltrue([
+      for x in split(":", var.local_mount_owner) : (length(x) > 0)
+    ])
+    error_message = "Both user and group part must be non-empty"
+  }
+}
+
+variable "local_mount_permissions" {
+  description = "Local mount permissions, specified as mode according to chmod(2). Defaults to 0755."
+  type        = string
+  default     = ""
+  nullable    = false
 }
 
 variable "fs_type" {

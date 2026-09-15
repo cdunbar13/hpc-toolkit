@@ -1,4 +1,4 @@
-# Copyright 2024 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,5 +14,5 @@
 
 output "registry_url" {
   description = "The URL of the created artifact registry."
-  value       = "${var.region}-docker.pkg.dev/${var.project_id}/${var.deployment_name}"
+  value       = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.artifact_registry.repository_id}"
 }

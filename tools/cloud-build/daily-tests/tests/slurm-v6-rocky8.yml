@@ -1,4 +1,4 @@
-# Copyright 2022 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ deployment_name: "rock-8-{{ build }}"
 slurm_cluster_name: "rock8{{ build[0:5] }}"
 
 cli_deployment_vars:
-  network_name: "{{ network }}"
+  test_name: "{{ test_name }}"
   region: us-central1
   zone: us-central1-a
 

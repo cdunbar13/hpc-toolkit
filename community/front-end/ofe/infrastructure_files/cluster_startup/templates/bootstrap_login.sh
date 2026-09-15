@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ else
 fi
 
 cd /tmp
-gsutil -m cp -r "gs://${BUCKET}/clusters/ansible_setup" /tmp
+gcloud storage cp --recursive "gs://${BUCKET}/clusters/ansible_setup" /tmp
 cd /tmp/ansible_setup
 
 # Set up facts file

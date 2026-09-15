@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2024 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+set -e
+
+unset CUDA_VISIBLE_DEVICES
 
 LOG_FILE="/var/log/slurm/chs_health_check.log"
 TMP_DCGM_OUT="/tmp/dcgm.out"
@@ -35,6 +39,24 @@ fi
 if ! type -P nv-hostengine 1>/dev/null; then
     log_step "nv-hostengine not found - this script requires nv-hostengine to function"
     exit 0
+fi
+
+###################################################
+# Disable running health checks
+###################################################
+# Check if the environment variable '$SLURM_JOB_EXTRA' is set and contains the
+# substring 'healthchecks_prolog=off'
+if [[ -n "$SLURM_JOB_EXTRA" ]]; then
+  log_step "Environment variable SLURM_JOB_EXTRA is set. Checking if it contains healthchecks_prolog=off."
+  # Check if the value of the variable matches the string "healthchecks_prolog=off"
+  if [[ "$SLURM_JOB_EXTRA" == *"healthchecks_prolog=off"* ]]; then
+    log_step "Environment variable SLURM_JOB_EXTRA matches substring healthchecks_prolog=off. Skipping health checks."
+    exit 0
+  else
+    log_step "Environment variable SLURM_JOB_EXTRA does NOT match substring healthchecks_prolog=off. Attempting to run health checks."
+  fi
+else
+    log_step "Environment variable SLURM_JOB_EXTRA is NOT set. Attempting to run health checks."
 fi
 
 # Exit if GPU isn't H/B 100/200

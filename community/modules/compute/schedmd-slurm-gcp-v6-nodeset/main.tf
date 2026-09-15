@@ -1,4 +1,4 @@
-# Copyright 2023 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,11 +17,19 @@ locals {
   labels = merge(var.labels, { ghpc_module = "schedmd-slurm-gcp-v6-nodeset", ghpc_role = "compute" })
 }
 
+module "instance_validation" {
+  source = "../../../../modules/internal/instance_validations"
+
+  machine_type = var.machine_type
+  disk_type    = var.disk_type
+}
+
 module "gpu" {
   source = "../../../../modules/internal/gpu-definition"
 
   machine_type      = var.machine_type
   guest_accelerator = var.guest_accelerator
+  machine_configs   = var.machine_configs
 }
 
 locals {
@@ -38,14 +46,17 @@ locals {
 
   additional_disks = [
     for ad in var.additional_disks : {
-      disk_name                  = ad.disk_name
-      device_name                = ad.device_name
-      disk_type                  = ad.disk_type
-      disk_size_gb               = ad.disk_size_gb
-      disk_labels                = merge(ad.disk_labels, local.labels)
-      auto_delete                = ad.auto_delete
-      boot                       = ad.boot
-      disk_resource_manager_tags = ad.disk_resource_manager_tags
+      disk_name                           = ad.disk_name
+      device_name                         = ad.device_name
+      disk_type                           = ad.disk_type
+      disk_storage_pool                   = ad.disk_storage_pool
+      disk_size_gb                        = ad.disk_size_gb
+      disk_labels                         = merge(ad.disk_labels, local.labels)
+      auto_delete                         = ad.auto_delete
+      boot                                = ad.boot
+      disk_resource_manager_tags          = ad.disk_resource_manager_tags
+      disk_encryption_key                 = ad.disk_encryption_key
+      disk_encryption_key_service_account = ad.disk_encryption_key_service_account
     }
   ]
 
@@ -70,26 +81,33 @@ locals {
     node_conf              = var.node_conf
     nodeset_name           = local.name
     dws_flex               = var.dws_flex
+    provisioning_engine    = var.provisioning_engine
 
     disk_auto_delete           = var.disk_auto_delete
     disk_labels                = merge(local.labels, var.disk_labels)
     disk_size_gb               = var.disk_size_gb
     disk_type                  = var.disk_type
+    disk_storage_pool          = var.disk_storage_pool
     disk_resource_manager_tags = var.disk_resource_manager_tags
     additional_disks           = local.additional_disks
+
+    disk_encryption_key                 = var.disk_encryption_key
+    disk_encryption_key_service_account = var.disk_encryption_key_service_account
 
     bandwidth_tier = var.bandwidth_tier
     can_ip_forward = var.can_ip_forward
 
-    enable_confidential_vm = var.enable_confidential_vm
-    enable_placement       = var.enable_placement
-    placement_max_distance = var.placement_max_distance
-    enable_oslogin         = var.enable_oslogin
-    enable_shielded_vm     = var.enable_shielded_vm
-    gpu                    = one(local.guest_accelerator)
+    enable_confidential_vm     = var.enable_confidential_vm
+    confidential_instance_type = var.confidential_instance_type
+    enable_placement           = var.enable_placement
+    placement_max_distance     = var.placement_max_distance
+    enable_oslogin             = var.enable_oslogin
+    enable_shielded_vm         = var.enable_shielded_vm
+    gpu                        = one(local.guest_accelerator)
+    accelerator_topology       = var.accelerator_topology
 
     labels                    = local.labels
-    machine_type              = terraform_data.machine_type_zone_validation.output
+    machine_type              = var.machine_type
     advanced_machine_features = var.advanced_machine_features
     metadata                  = local.metadata
     min_cpu_platform          = var.min_cpu_platform
@@ -147,7 +165,7 @@ data "google_compute_zones" "available" {
 }
 
 locals {
-  res_match = regex("^(?P<whole>(?P<prefix>projects/(?P<project>[a-z0-9-]+)/reservations/)?(?P<name>[a-z0-9-]+)(?P<suffix>/reservationBlocks/[a-z0-9-]+)?)?$", var.reservation_name)
+  res_match = regex("^(?P<whole>(?P<prefix>projects/(?P<project>[a-z0-9-]+)/reservations/)?(?P<name>[a-z0-9-]+)(?P<suffix>/reservationBlocks/[a-z0-9-]+(?:/reservationSubBlocks/[a-z0-9-]+)?)?)?$", var.reservation_name)
 
   res_short_name = local.res_match.name
   res_project    = coalesce(local.res_match.project, var.project_id)
@@ -194,31 +212,5 @@ data "google_compute_reservation" "reservation" {
 
     # TODO: wait for https://github.com/hashicorp/terraform-provider-google/issues/18248
     # Add a validation that if reservation.project != var.project_id it should be a shared reservation
-  }
-}
-
-data "google_compute_machine_types" "machine_types_by_zone" {
-  for_each = local.zones
-  project  = var.project_id
-  filter   = format("name = \"%s\"", var.machine_type)
-  zone     = each.value
-}
-
-locals {
-  machine_types_by_zone   = data.google_compute_machine_types.machine_types_by_zone
-  zones_with_machine_type = [for k, v in local.machine_types_by_zone : k if length(v.machine_types) > 0]
-}
-
-resource "terraform_data" "machine_type_zone_validation" {
-  input = var.machine_type
-  lifecycle {
-    precondition {
-      condition     = length(local.zones_with_machine_type) > 0
-      error_message = <<-EOT
-        machine type ${var.machine_type} is not available in any of the zones ${jsonencode(local.zones)}". To list zones in which it is available, run:
-
-        gcloud compute machine-types list --filter="name=${var.machine_type}"
-        EOT
-    }
   }
 }

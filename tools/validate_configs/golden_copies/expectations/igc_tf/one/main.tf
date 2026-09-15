@@ -1,5 +1,5 @@
 /**
-  * Copyright 2023 Google LLC
+  * Copyright 2026 Google LLC
   *
   * Licensed under the Apache License, Version 2.0 (the "License");
   * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ terraform {
 }
 
 module "homefs" {
-  source          = "./modules/embedded/modules/file-system/filestore"
+  source          = "../_modules/embedded/modules/file-system/filestore"
   connect_mode    = file(var.connect_mode_file_path)
   deployment_name = var.deployment_name
   labels          = var.labels

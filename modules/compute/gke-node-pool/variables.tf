@@ -1,5 +1,5 @@
 /**
- * Copyright 2023 Google LLC
+ * Copyright 2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,6 +37,15 @@ variable "name" {
     EOD
   type        = string
   default     = null
+
+  validation {
+    # Check if the variable is null OR if it matches the GCP resource naming regex.
+    condition     = var.name == null || can(regex("^[a-z]([-a-z0-9]{0,34}[a-z0-9])?$", var.name))
+    error_message = <<-EOD
+    If provided, the node pool name must be between 1 and 36 characters, start with a lowercase letter, end with an alphanumeric, and contain only lowercase letters, numbers, and hyphens.
+    Underscores are not allowed. A shorter length is enforced to accommodate a suffix when creating multiple node pools.
+    EOD
+  }
 }
 
 variable "internal_ghpc_module_id" {
@@ -58,6 +67,12 @@ variable "disk_size_gb" {
 
 variable "disk_type" {
   description = "Disk type for each node."
+  type        = string
+  default     = null
+}
+
+variable "disk_storage_pool" {
+  description = "Storage pool to use for the node's boot disk. Note that storage pools are only supported with Hyperdisk types. For boot disks, only hyperdisk-balanced is supported. You must provide an existing storage pool, as this module does not create new ones."
   type        = string
   default     = null
 }
@@ -140,12 +155,22 @@ variable "autoscaling_total_min_nodes" {
   description = "Total minimum number of nodes in the NodePool."
   type        = number
   default     = 0
+
+  validation {
+    condition     = var.autoscaling_min_node_count == null || var.autoscaling_total_min_nodes == 0
+    error_message = "autoscaling_total_min_nodes (global) is mutually exclusive with autoscaling_min_node_count (zonal). Please unset one of them."
+  }
 }
 
 variable "autoscaling_total_max_nodes" {
   description = "Total maximum number of nodes in the NodePool."
   type        = number
   default     = 1000
+
+  validation {
+    condition     = var.autoscaling_max_node_count == null || var.autoscaling_total_max_nodes == 1000
+    error_message = "autoscaling_total_max_nodes (global) is mutually exclusive with autoscaling_max_node_count (zonal). Please unset one of them."
+  }
 }
 
 variable "static_node_count" {
@@ -155,7 +180,7 @@ variable "static_node_count" {
 }
 
 variable "is_reservation_active" {
-  description = "Whether the specified reservation is already created."
+  description = "Whether the specified reservation is already created. When is_reservation_active is set to false, static_node_count, autoscaling_min_node_count, autoscaling_max_node_count, and initial_node_count must all be either null or 0."
   type        = bool
   default     = true
 }
@@ -430,8 +455,14 @@ variable "run_workload_script" {
   default     = true
 }
 
+variable "install_gpu_direct_manifests" {
+  description = "If true, automatically downloads and applies GPUDirect (NCCL and NRI) manifests from GitHub for A3 High/Mega GPUs. Set to false if you are applying these manifests manually."
+  type        = bool
+  default     = true
+}
+
 variable "enable_queued_provisioning" {
-  description = "If true, enables Dynamic Workload Scheduler and adds the cloud.google.com/gke-queued taint to the node pool."
+  description = "If true, enables Dynamic Workload Scheduler and adds the cloud.google.com/gke-queued taint to the node pool. This cannot be true if `accelerator_topology_mode` is set to `PROVISION_ONLY`."
   type        = bool
   default     = false
 }
@@ -456,7 +487,7 @@ variable "max_run_duration" {
 variable "enable_private_nodes" {
   description = "Whether nodes have internal IP addresses only."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "num_node_pools" {
@@ -469,4 +500,107 @@ variable "num_slices" {
   description = "Number of TPUs slices to create. This is same as num_node_pools."
   type        = number
   default     = 1
+}
+
+variable "enable_numa_aware_scheduling" {
+  description = "Enable [NUMA-aware](https://cloud.google.com/kubernetes-engine/distributed-cloud/bare-metal/docs/vm-runtime/numa) scheduling."
+  type        = bool
+  default     = false
+}
+
+variable "enable_dranet" {
+  type        = bool
+  default     = false
+  description = "Enable GKE managed Dynamic Resource Allocation (DRA) driver for networking (DRANET) and Accelerator Network Profile (ANP). When set to true, this enables the driver for supported GPU/TPU nodes on GKE 1.34.1-gke.1829001 or later when Dataplane V2 is enabled on the cluster."
+}
+
+variable "autoscaling_min_node_count" {
+  # NOTE: This variable is currently only required for deploying TPU DWS Flex clusters
+  description = "Minimum number of nodes per zone in the NodePool. Cannot be used with autoscaling_total_min_nodes."
+  type        = number
+  default     = null
+}
+
+variable "autoscaling_max_node_count" {
+  # NOTE: This variable is currently only required for deploying TPU DWS Flex clusters
+  description = "Maximum number of nodes per zone in the NodePool. Cannot be used with autoscaling_total_max_nodes."
+  type        = number
+  default     = null
+}
+
+variable "linux_node_config" {
+  description = "Linux node configuration (e.g., sysctls, hugepages)."
+  type = object({
+    sysctls = optional(map(string), {
+      "net.ipv4.tcp_rmem" = "4096 87380 16777216"
+      "net.ipv4.tcp_wmem" = "4096 16384 16777216"
+    })
+    hugepages_config = optional(object({
+      hugepage_size_2m = optional(number)
+      hugepage_size_1g = optional(number)
+    }))
+  })
+  default  = {}
+  nullable = false
+}
+
+variable "accelerator_topology_mode" {
+  description = "The accelerator topology mode for the resource policy. It accepts values like `PROVISION_ONLY` or `AUTO_CONNECT`. Note that `enable_queued_provisioning` (DWS) is not supported when `accelerator_topology_mode` is set to `PROVISION_ONLY`."
+  type        = string
+  default     = null
+}
+
+variable "machine_configs" {
+  description = "Definition of GCE machine types and counts"
+  type        = any
+  default     = {}
+}
+
+variable "dranet_device_class_name" {
+  type        = string
+  default     = null
+  description = "DRA device class name. If null, automatically detected based on machine type. Default is mrdma.google.com (RDMA) for RDMA-supported machines, netdev.google.com for others."
+}
+
+variable "install_dranet_template" {
+  type        = bool
+  default     = true
+  description = "If true, automatically deploys the DRANET ResourceClaimTemplate. The compiler automatically overrides this to false for subsequent node pools in the same cluster if they use the same device class."
+}
+
+
+variable "dranet_allocation_mode" {
+  type        = string
+  default     = "All"
+  description = "Allocation mode for the auto-applied DRANET ResourceClaimTemplate (e.g., 'All' or 'ExactCount')."
+}
+
+variable "dranet_device_count" {
+  type        = number
+  default     = null
+  description = "Device count for the auto-applied DRANET ResourceClaimTemplate. Required if dranet_allocation_mode is 'ExactCount'."
+}
+
+variable "enable_confidential_nodes" {
+  description = "Enable Confidential Nodes for this node pool."
+  type        = bool
+  default     = false
+}
+
+variable "confidential_instance_type" {
+  description = "The type of technology used by the confidential nodes (e.g., SEV, SEV_SNP, TDX). Leave null for default."
+  type        = string
+  default     = null
+}
+
+variable "enable_confidential_storage" {
+  description = "Enable Confidential Storage on the node pool. Node boot disks will be encrypted using keys protected by the Confidential VM."
+  type        = bool
+  default     = false
+}
+
+variable "boot_disk_kms_key" {
+  description = "The Customer Managed Encryption Key (CMEK) used to encrypt the boot disks of the GKE nodes. Required if enable_confidential_storage is true."
+  type        = string
+  default     = null
 }

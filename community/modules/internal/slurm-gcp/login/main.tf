@@ -1,4 +1,4 @@
-# Copyright 2025 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,21 +21,24 @@ module "template" {
   slurm_bucket_path   = var.slurm_bucket_path
   name_prefix         = local.name
 
-  additional_disks           = var.login_nodes.additional_disks
-  bandwidth_tier             = var.login_nodes.bandwidth_tier
-  can_ip_forward             = var.login_nodes.can_ip_forward
-  advanced_machine_features  = var.login_nodes.advanced_machine_features
-  disk_auto_delete           = var.login_nodes.disk_auto_delete
-  disk_labels                = var.login_nodes.disk_labels
-  disk_resource_manager_tags = var.login_nodes.disk_resource_manager_tags
-  disk_size_gb               = var.login_nodes.disk_size_gb
-  disk_type                  = var.login_nodes.disk_type
-  enable_confidential_vm     = var.login_nodes.enable_confidential_vm
-  enable_oslogin             = var.login_nodes.enable_oslogin
-  enable_shielded_vm         = var.login_nodes.enable_shielded_vm
-  gpu                        = var.login_nodes.gpu
-  labels                     = var.login_nodes.labels
-  machine_type               = var.login_nodes.machine_type
+  additional_disks                    = var.login_nodes.additional_disks
+  bandwidth_tier                      = var.login_nodes.bandwidth_tier
+  can_ip_forward                      = var.login_nodes.can_ip_forward
+  disk_encryption_key                 = var.login_nodes.disk_encryption_key
+  disk_encryption_key_service_account = var.login_nodes.disk_encryption_key_service_account
+  advanced_machine_features           = var.login_nodes.advanced_machine_features
+  disk_auto_delete                    = var.login_nodes.disk_auto_delete
+  disk_labels                         = var.login_nodes.disk_labels
+  disk_resource_manager_tags          = var.login_nodes.disk_resource_manager_tags
+  disk_size_gb                        = var.login_nodes.disk_size_gb
+  disk_type                           = var.login_nodes.disk_type
+  disk_storage_pool                   = var.login_nodes.disk_storage_pool
+  enable_confidential_vm              = var.login_nodes.enable_confidential_vm
+  enable_oslogin                      = var.login_nodes.enable_oslogin
+  enable_shielded_vm                  = var.login_nodes.enable_shielded_vm
+  gpu                                 = var.login_nodes.gpu
+  labels                              = var.login_nodes.labels
+  machine_type                        = var.login_nodes.machine_type
   metadata = merge(var.login_nodes.metadata, {
     "universe_domain"   = var.universe_domain,
     "slurm_login_group" = local.name
@@ -54,6 +57,8 @@ module "template" {
   subnetwork               = var.login_nodes.subnetwork
   tags                     = concat([var.slurm_cluster_name], var.login_nodes.tags)
   termination_action       = var.login_nodes.termination_action
+
+  internal_startup_script = var.internal_startup_script
 }
 
 module "instance" {
@@ -83,9 +88,10 @@ resource "google_storage_bucket_object" "startup_scripts" {
     ) => s.content
   }
 
-  bucket  = var.slurm_bucket_name
-  name    = "${var.slurm_bucket_dir}/${each.key}"
-  content = each.value
+  bucket         = var.slurm_bucket_name
+  name           = "${var.slurm_bucket_dir}/${each.key}"
+  content        = each.value
+  source_md5hash = md5(each.value)
 }
 
 locals {
@@ -99,9 +105,10 @@ locals {
 }
 
 resource "google_storage_bucket_object" "config" {
-  bucket  = var.slurm_bucket_name
-  name    = "${var.slurm_bucket_dir}/login_group_configs/${local.name}.yaml"
-  content = yamlencode(local.config)
+  bucket         = var.slurm_bucket_name
+  name           = "${var.slurm_bucket_dir}/login_group_configs/${local.name}.yaml"
+  content        = yamlencode(local.config)
+  source_md5hash = md5(yamlencode(local.config))
 
   # To ensure that login group "is not ready" until all startup scripts are written down
   depends_on = [google_storage_bucket_object.startup_scripts]

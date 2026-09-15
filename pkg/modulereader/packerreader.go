@@ -1,5 +1,5 @@
 /**
- * Copyright 2022 Google LLC
+ * Copyright 2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import (
 	"hpc-toolkit/pkg/logging"
 	"hpc-toolkit/pkg/sourcereader"
 	"os"
-	"path"
 	"path/filepath"
 )
 
@@ -68,8 +67,8 @@ func (r PackerReader) GetInfo(source string) (ModuleInfo, error) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	modName := path.Base(source)
-	modPath := path.Join(tmpDir, modName)
+	modName := filepath.Base(source)
+	modPath := filepath.Join(tmpDir, modName)
 
 	sourceReader := sourcereader.Factory(source)
 	if err = sourceReader.GetModule(source, modPath); err != nil {

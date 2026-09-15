@@ -1,4 +1,4 @@
-# Copyright 2024 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,10 +22,13 @@ vars:
   region: us-central1
   zone: us-central1-a
   gpu_zones: [us-central1-a, us-central1-b, us-central1-c, us-central1-f]
+  lustre_instance_id: lustre-hpc
   slurm_image:
     # Visit https://github.com/GoogleCloudPlatform/slurm-gcp/blob/master/docs/images.md#published-image-family
     # for a list of valid family options with Slurm
-    family: slurm-gcp-6-9-hpc-rocky-linux-8
+    # Rocky 8: slurm-gcp-6-12-hpc-rocky-linux-8
+    # Rocky 9: slurm-gcp-6-12-hpc-rocky-linux-9
+    family: slurm-gcp-6-12-hpc-rocky-linux-9
     project: schedmd-slurm-public
   # If image above is changed to use custom image, then setting below must be set to true
   instance_image_custom: false
@@ -58,23 +61,23 @@ deployment_groups:
   # the module by Filestore modules.
   # https://cloud.google.com/vpc/docs/configure-private-services-access#permissions
   - id: private_service_access
-    source: community/modules/network/private-service-access
+    source: modules/network/private-service-access
     use: [network]
 
   - id: controller_sa
-    source: community/modules/project/service-account
+    source: modules/project/service-account
     settings:
       name: controller
       project_roles:
+      - bigquery.dataOwner # needed if enable_bigquery_load is enabled
       - compute.instanceAdmin.v1
       - iam.serviceAccountUser
       - logging.logWriter
       - monitoring.metricWriter
-      - pubsub.admin
       - storage.objectViewer
 
   - id: login_sa
-    source: community/modules/project/service-account
+    source: modules/project/service-account
     settings:
       name: login
       project_roles:
@@ -83,13 +86,13 @@ deployment_groups:
       - storage.objectViewer
 
   - id: compute_sa
-    source: community/modules/project/service-account
+    source: modules/project/service-account
     settings:
       name: compute
       project_roles:
       - logging.logWriter
       - monitoring.metricWriter
-      - storage.objectCreator
+      - storage.objectUser
 
   - id: homefs
     source: modules/file-system/filestore
@@ -103,13 +106,14 @@ deployment_groups:
     settings:
       local_mount: /projects
 
-  # This file system has an associated license cost.
-  # https://console.developers.google.com/marketplace/product/ddnstorage/exascaler-cloud
-  - id: scratchfs
-    source: community/modules/file-system/DDN-EXAScaler
-    use: [network]
+  - id: lustre-gcp
+    source: modules/file-system/managed-lustre
+    use: [network, private_service_access]
     settings:
-      local_mount: /scratch
+      name: $(vars.lustre_instance_id)
+      local_mount: /lustre
+      remote_mount: lustrefs
+      size_gib: 36000
 
   - id: n2_nodeset
     source: community/modules/compute/schedmd-slurm-gcp-v6-nodeset
@@ -136,8 +140,8 @@ deployment_groups:
     settings:
       node_count_dynamic_max: 20
       machine_type: c2-standard-60  # this is the default
-      instance_image: $(vars.slurm_image)
       bandwidth_tier: tier_1_enabled
+      instance_image: $(vars.slurm_image)
       disk_type: pd-ssd
       disk_size_gb: 100
       allow_automatic_updates: false
@@ -280,11 +284,11 @@ deployment_groups:
       # we recommend disabling public IPs if possible
       # but that requires your network to have a NAT or
       # private access configured
-      enable_login_public_ips: true
+      enable_login_public_ips: false
 
   - id: slurm_controller
     source: community/modules/scheduler/schedmd-slurm-gcp-v6-controller
-    use: [network, controller_sa, homefs, projectsfs, scratchfs, slurm_login,
+    use: [network, controller_sa, homefs, projectsfs, lustre-gcp, slurm_login,
           n2_partition, c2_partition, c2d_partition, c3_partition, a2_8_partition, a2_16_partition, h3_partition]
     settings:
       instance_image: $(vars.slurm_image)
@@ -299,7 +303,7 @@ deployment_groups:
       # we recommend disabling public IPs if possible
       # but that requires your network to have a NAT or
       # private access configured
-      enable_controller_public_ips: true
+      enable_controller_public_ips: false
 
   - id: hpc_dashboard
     source: modules/monitoring/dashboard

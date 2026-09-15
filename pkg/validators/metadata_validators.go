@@ -1,0 +1,823 @@
+// Copyright 2026 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License and limitations under the License.
+
+package validators
+
+import (
+	"fmt"
+	"net"
+	"regexp"
+	"strings"
+
+	"hpc-toolkit/pkg/config"
+	"hpc-toolkit/pkg/modulereader"
+
+	"github.com/zclconf/go-cty/cty"
+)
+
+// CIDRValidator implements the RuleValidator interface for the 'cidr' type.
+// It verifies that a given string is a valid IP CIDR block.
+// Used in a module's metadata.yaml via `- validator: cidr`.
+type CIDRValidator struct{}
+
+func extractCIDRValue(val cty.Value, objectKey string, allowNull bool, path config.Path) (cty.Value, error) {
+	if val.IsNull() {
+		return cty.NullVal(cty.String), nil
+	}
+	if val.Type() == cty.String {
+		return val, nil
+	}
+	if val.Type().IsObjectType() {
+		if objectKey == "" {
+			return cty.NilVal, config.BpError{Err: fmt.Errorf("object_key is required when validating an object"), Path: path}
+		}
+		if !val.Type().HasAttribute(objectKey) {
+			if !allowNull {
+				return cty.NilVal, config.BpError{Err: fmt.Errorf("missing key %q in object", objectKey), Path: path}
+			}
+			return cty.NilVal, nil
+		}
+		return val.GetAttr(objectKey), nil
+	}
+	if val.Type().IsMapType() {
+		if objectKey == "" {
+			return cty.NilVal, config.BpError{Err: fmt.Errorf("object_key is required when validating a map"), Path: path}
+		}
+		if !val.HasIndex(cty.StringVal(objectKey)).True() {
+			if !allowNull {
+				return cty.NilVal, config.BpError{Err: fmt.Errorf("missing key %q in map", objectKey), Path: path}
+			}
+			return cty.NilVal, nil
+		}
+		return val.Index(cty.StringVal(objectKey)), nil
+	}
+	return cty.NilVal, config.BpError{Err: fmt.Errorf("unsupported type %s for CIDR validation", val.Type().FriendlyName()), Path: path}
+}
+
+func validateCIDRValue(cidrVal cty.Value, rule modulereader.ValidationRule, allowNull bool, path config.Path) error {
+	if cidrVal == cty.NilVal {
+		return nil
+	}
+	if cidrVal.IsNull() {
+		if allowNull {
+			return nil
+		}
+		msg := rule.ErrorMessage
+		if msg == "" {
+			msg = "CIDR block cannot be null or empty"
+		}
+		return config.BpError{Err: fmt.Errorf("%s", msg), Path: path}
+	}
+	if cidrVal.Type() != cty.String {
+		return config.BpError{Err: fmt.Errorf("CIDR block must be a string, got %s", cidrVal.Type().FriendlyName()), Path: path}
+	}
+	if !cidrVal.IsKnown() {
+		return nil
+	}
+	str := cidrVal.AsString()
+	if _, _, err := net.ParseCIDR(str); err != nil {
+		msg := rule.ErrorMessage
+		if msg == "" {
+			msg = fmt.Sprintf("invalid CIDR address: %s", str)
+		}
+		return config.BpError{Err: fmt.Errorf("%s", msg), Path: path}
+	}
+	return nil
+}
+
+// Validate checks if the variables specified in the rule are valid CIDR addresses.
+func (c *CIDRValidator) Validate(
+	bp config.Blueprint,
+	mod config.Module,
+	rule modulereader.ValidationRule,
+	group config.Group,
+	modIdx int) error {
+
+	allowNull, err := parseBoolInput(rule.Inputs, "allow_null", false)
+	if err != nil {
+		modPath := config.Root.Groups.At(bp.GroupIndex(group.Name)).Modules.At(modIdx).Source
+		return config.BpError{Err: fmt.Errorf("validation rule for module %q: %v", mod.ID, err), Path: modPath}
+	}
+	objectKey, _ := parseString(rule.Inputs["object_key"])
+
+	return IterateRuleTargets(bp, mod, rule, group, modIdx, func(t Target) error {
+		for _, val := range t.Values {
+			if !val.IsKnown() {
+				continue
+			}
+			cidrVal, err := extractCIDRValue(val, objectKey, allowNull, t.Path)
+			if err != nil {
+				return err
+			}
+			if err := validateCIDRValue(cidrVal, rule, allowNull, t.Path); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// RegexValidator implements the Validator interface for 'regex' type.
+type RegexValidator struct{}
+
+func resolveSettingToString(
+	bp config.Blueprint,
+	group config.Group,
+	modIdx int,
+	mod config.Module,
+	settingName string,
+	optional bool,
+	allowNull bool,
+) (string, bool, config.Path, error) {
+	val, path := getSettingWithFallback(bp, group, modIdx, mod, settingName)
+	if val == cty.NilVal {
+		if optional {
+			return "", false, path, nil
+		}
+		return "", false, path, config.BpError{
+			Err:  fmt.Errorf("setting %q not found in module %q settings", settingName, mod.ID),
+			Path: path,
+		}
+	}
+	if val.Type() != cty.String {
+		return "", false, path, config.BpError{Err: fmt.Errorf("setting %q must be a string", settingName), Path: path}
+	}
+	if !val.IsKnown() {
+		return "", false, path, nil
+	}
+	if val.IsNull() {
+		if !allowNull {
+			return "", false, path, config.BpError{Err: fmt.Errorf("setting %q cannot be null", settingName), Path: path}
+		}
+		return "", true, path, nil
+	}
+	return val.AsString(), true, path, nil
+}
+
+func (r *RegexValidator) validateConcat(
+	bp config.Blueprint,
+	mod config.Module,
+	rule modulereader.ValidationRule,
+	group config.Group,
+	modIdx int,
+	re *regexp.Regexp,
+	patternRaw string,
+	optional bool,
+) error {
+	varsList, _ := parseStringList(rule.Inputs["vars"])
+	separator, _ := parseString(rule.Inputs["separator"])
+	allowNullList, _ := parseStringList(rule.Inputs["allow_null"])
+	allowNullMap := make(map[string]struct{})
+	for _, v := range allowNullList {
+		allowNullMap[v] = struct{}{}
+	}
+
+	var parts []string
+	var targetPath config.Path
+	first := true
+
+	for _, varName := range varsList {
+		_, allowNull := allowNullMap[varName]
+		val, known, path, err := resolveSettingToString(bp, group, modIdx, mod, varName, optional, allowNull)
+		if err != nil {
+			return err
+		}
+		if !known {
+			return nil
+		}
+		if first {
+			targetPath = path
+			first = false
+		}
+		if val != "" {
+			parts = append(parts, val)
+		}
+	}
+
+	if len(parts) == 0 {
+		return nil
+	}
+
+	joined := strings.Join(parts, separator)
+	if !re.MatchString(joined) {
+		msg := rule.ErrorMessage
+		if msg == "" {
+			msg = fmt.Sprintf("concatenated value %q does not match pattern %q", joined, patternRaw)
+		}
+		return config.BpError{Err: fmt.Errorf("%s", msg), Path: targetPath}
+	}
+	return nil
+}
+
+func (r *RegexValidator) validateStandard(
+	bp config.Blueprint,
+	mod config.Module,
+	rule modulereader.ValidationRule,
+	group config.Group,
+	modIdx int,
+	re *regexp.Regexp,
+	patternRaw string,
+) error {
+	validateValues := func(values []cty.Value, path config.Path) error {
+		for _, val := range values {
+			if val == cty.NilVal || !val.IsKnown() || val.IsNull() || val.Type() != cty.String {
+				continue
+			}
+			if !re.MatchString(val.AsString()) {
+				msg := rule.ErrorMessage
+				if msg == "" {
+					msg = fmt.Sprintf("value %q does not match pattern %q", val.AsString(), patternRaw)
+				}
+				return config.BpError{Err: fmt.Errorf("%s", msg), Path: path}
+			}
+		}
+		return nil
+	}
+
+	return IterateRuleTargets(bp, mod, rule, group, modIdx, func(t Target) error {
+		return validateValues(t.Values, t.Path)
+	})
+}
+
+// Validate checks if the variables specified in the rule match the provided regex pattern.
+func (r *RegexValidator) Validate(
+	bp config.Blueprint,
+	mod config.Module,
+	rule modulereader.ValidationRule,
+	group config.Group,
+	modIdx int) error {
+
+	// Extract pattern
+	patternRaw, ok := rule.Inputs["pattern"].(string)
+	if !ok || patternRaw == "" {
+		return config.BpError{
+			Err: fmt.Errorf(
+				"validation rule for module %q is missing a string 'pattern' in inputs", mod.ID),
+			Path: config.Root.Groups.At(bp.GroupIndex(group.Name)).Modules.At(modIdx).Source,
+		}
+	}
+
+	// compile regex
+	re, err := regexp.Compile(patternRaw)
+	if err != nil {
+		return config.BpError{
+			Err:  fmt.Errorf("failed to compile regex for module %q: %v", mod.ID, err),
+			Path: config.Root.Groups.At(bp.GroupIndex(group.Name)).Modules.At(modIdx).Source,
+		}
+	}
+
+	concat, err := parseBoolInput(rule.Inputs, "concat", false)
+	if err != nil {
+		return config.BpError{
+			Err:  fmt.Errorf("failed to parse 'concat' input: %w", err),
+			Path: config.Root.Groups.At(bp.GroupIndex(group.Name)).Modules.At(modIdx).Source,
+		}
+	}
+
+	optional, err := parseBoolInput(rule.Inputs, "optional", true)
+	if err != nil {
+		return config.BpError{
+			Err:  fmt.Errorf("failed to parse 'optional' input: %w", err),
+			Path: config.Root.Groups.At(bp.GroupIndex(group.Name)).Modules.At(modIdx).Source,
+		}
+	}
+
+	if concat {
+		return r.validateConcat(bp, mod, rule, group, modIdx, re, patternRaw, optional)
+	}
+	return r.validateStandard(bp, mod, rule, group, modIdx, re, patternRaw)
+}
+
+type AllowedEnumValidator struct{}
+
+// normalizeAllowed converts the 'allowed' input (either []string or []interface{}) into a standard string slice.
+func (v *AllowedEnumValidator) normalizeAllowed(allowedRaw interface{}) ([]string, error) {
+	var allowedList []string
+	switch t := allowedRaw.(type) {
+	case []string:
+		allowedList = t
+	case []interface{}:
+		for _, e := range t {
+			allowedList = append(allowedList, fmt.Sprintf("%v", e))
+		}
+	default:
+		return nil, fmt.Errorf("'allowed' must be a list of strings")
+	}
+	if len(allowedList) == 0 {
+		return nil, fmt.Errorf("'allowed' list must be non-empty")
+	}
+	return allowedList, nil
+}
+
+// checkValues iterates through cty.Values to ensure they exist within the allowed set, handling nulls and casing.
+func (v *AllowedEnumValidator) checkValues(values []cty.Value, path config.Path, allowedSet map[string]struct{}, allowedList []string, caseSensitive bool, allowNull bool, errMsg string) error {
+	for _, val := range values {
+		if val == cty.NilVal || !val.IsKnown() {
+			continue
+		}
+		if val.IsNull() {
+			if allowNull {
+				continue
+			}
+			msg := errMsg
+			if msg == "" {
+				msg = fmt.Sprintf("null value is not allowed; allowed values: %v", allowedList)
+			}
+			return config.BpError{Err: fmt.Errorf("%s", msg), Path: path}
+		}
+
+		if val.Type() != cty.String {
+			continue
+		}
+
+		str := val.AsString()
+		key := str
+		if !caseSensitive {
+			key = strings.ToLower(str)
+		}
+
+		if _, ok := allowedSet[key]; !ok {
+			msg := errMsg
+			if msg == "" {
+				msg = fmt.Sprintf("invalid value %q; allowed values: %v", str, allowedList)
+			}
+			return config.BpError{Err: fmt.Errorf("%s", msg), Path: path}
+		}
+	}
+	return nil
+}
+
+// Ensures that user-provided module settings conform to a predefined list of allowed values (enums).
+func (v *AllowedEnumValidator) Validate(
+	bp config.Blueprint,
+	mod config.Module,
+	rule modulereader.ValidationRule,
+	group config.Group,
+	modIdx int) error {
+
+	modPath := config.Root.Groups.At(bp.GroupIndex(group.Name)).Modules.At(modIdx).Source
+
+	// 1. Parse Metadata Inputs (flags)
+	caseSensitive, err := parseBoolInput(rule.Inputs, "case_sensitive", true)
+	if err != nil {
+		return config.BpError{
+			Err:  fmt.Errorf("validation rule for module %q: %v", mod.ID, err),
+			Path: modPath,
+		}
+	}
+
+	allowNull, err := parseBoolInput(rule.Inputs, "allow_null", false)
+	if err != nil {
+		return config.BpError{
+			Err:  fmt.Errorf("validation rule for module %q: %v", mod.ID, err),
+			Path: modPath,
+		}
+	}
+
+	// 2. Normalize the 'allowed' list
+	allowedRaw, ok := rule.Inputs["allowed"]
+	if !ok {
+		return config.BpError{
+			Err:  fmt.Errorf("validation rule for module %q is missing an 'allowed' list", mod.ID),
+			Path: modPath,
+		}
+	}
+
+	allowedList, err := v.normalizeAllowed(allowedRaw)
+	if err != nil {
+		return config.BpError{
+			Err:  fmt.Errorf("validation rule for module %q: %v", mod.ID, err),
+			Path: modPath,
+		}
+	}
+
+	// 3. Build the lookup set
+	allowedSet := make(map[string]struct{}, len(allowedList))
+	for _, s := range allowedList {
+		key := s
+		if !caseSensitive {
+			key = strings.ToLower(s)
+		}
+		allowedSet[key] = struct{}{}
+	}
+
+	// 4. Iterate and validate user-provided values
+	return IterateRuleTargets(bp, mod, rule, group, modIdx, func(t Target) error {
+		return v.checkValues(t.Values, t.Path, allowedSet, allowedList, caseSensitive, allowNull, rule.ErrorMessage)
+	})
+}
+
+// RangeValidator implements the RuleValidator interface for the 'range' validation type.
+type RangeValidator struct{}
+
+// checkBounds validates a single integer value against the optional minimum and maximum bounds.
+func (r *RangeValidator) checkBounds(value int, min *int, max *int, customErrMsg string, path config.Path) error {
+	if min != nil && value < *min {
+		msg := customErrMsg
+		if msg == "" {
+			msg = fmt.Sprintf("value %d is less than the minimum allowed value of %d", value, *min)
+		}
+		return config.BpError{Err: fmt.Errorf("%s", msg), Path: path}
+	}
+	if max != nil && value > *max {
+		msg := customErrMsg
+		if msg == "" {
+			msg = fmt.Sprintf("value %d is greater than the maximum allowed value of %d", value, *max)
+		}
+		return config.BpError{Err: fmt.Errorf("%s", msg), Path: path}
+	}
+	return nil
+}
+
+// validateTarget applies range validation to a list of cty.Values.
+func (r *RangeValidator) validateTarget(
+	values []cty.Value,
+	path config.Path,
+	min *int,
+	max *int,
+	lengthCheck bool,
+	customErrMsg string) error {
+	if lengthCheck {
+		return r.checkBounds(len(values), min, max, customErrMsg, path)
+	}
+
+	for _, val := range values {
+		if val == cty.NilVal || !val.IsKnown() || val.IsNull() {
+			continue
+		}
+		if val.Type() == cty.Number {
+			f, _ := val.AsBigFloat().Float64()
+			if f != float64(int64(f)) {
+				return config.BpError{
+					Err:  fmt.Errorf("range validator only supports integer numbers, not %v", f),
+					Path: path,
+				}
+			}
+			if err := r.checkBounds(int(f), min, max, customErrMsg, path); err != nil {
+				return err
+			}
+		} else {
+			return config.BpError{
+				Err:  fmt.Errorf("range validator only supports numbers, not %s", val.Type().FriendlyName()),
+				Path: path,
+			}
+		}
+	}
+	return nil
+}
+
+// Validate checks if the variables specified in the rule fall within the specified numeric range or length constraints.
+func (r *RangeValidator) Validate(
+	bp config.Blueprint,
+	mod config.Module,
+	rule modulereader.ValidationRule,
+	group config.Group,
+	modIdx int) error {
+
+	modPath := config.Root.Groups.At(bp.GroupIndex(group.Name)).Modules.At(modIdx).Source
+
+	min, err := parseIntInput(rule.Inputs, "min")
+	if err != nil {
+		return config.BpError{Err: fmt.Errorf("validation rule for module %q: %v", mod.ID, err), Path: modPath}
+	}
+
+	max, err := parseIntInput(rule.Inputs, "max")
+	if err != nil {
+		return config.BpError{Err: fmt.Errorf("validation rule for module %q: %v", mod.ID, err), Path: modPath}
+	}
+
+	if min == nil && max == nil {
+		return config.BpError{
+			Err:  fmt.Errorf("range validator for module %q must have at least one of 'min' or 'max' defined", mod.ID),
+			Path: modPath,
+		}
+	}
+
+	if min != nil && max != nil && *max < *min {
+		return config.BpError{
+			Err:  fmt.Errorf("range validator for module %q must have 'min' less than or equal to 'max' defined", mod.ID),
+			Path: modPath,
+		}
+	}
+
+	checkListLength, err := parseBoolInput(rule.Inputs, "length_check", false)
+	if err != nil {
+		return config.BpError{Err: fmt.Errorf("validation rule for module %q: %v", mod.ID, err), Path: modPath}
+	}
+
+	return IterateRuleTargets(bp, mod, rule, group, modIdx, func(t Target) error {
+		return r.validateTarget(t.Values, t.Path, min, max, checkListLength, rule.ErrorMessage)
+	})
+}
+
+// ExclusiveValidator implements the RuleValidator interface for the 'exclusive' validation type.
+type ExclusiveValidator struct{}
+
+// Validate returns an error if more than one of the variables specified in the rule are "set" within the module configuration.
+func (e *ExclusiveValidator) Validate(
+	bp config.Blueprint,
+	mod config.Module,
+	rule modulereader.ValidationRule,
+	group config.Group,
+	modIdx int) error {
+	var setVarNames []string
+	handler := func(t Target) error {
+		if isVarSet(t.Values) {
+			setVarNames = append(setVarNames, t.Name)
+		}
+		return nil
+	}
+	if err := IterateRuleTargets(bp, mod, rule, group, modIdx, handler); err != nil {
+		return err
+	}
+	if len(setVarNames) > 1 {
+		modPath := config.Root.Groups.At(bp.GroupIndex(group.Name)).Modules.At(modIdx).Source
+		return config.BpError{Err: fmt.Errorf("%s: the following are set: %s", rule.ErrorMessage, strings.Join(setVarNames, ", ")), Path: modPath}
+	}
+	return nil
+}
+
+// RequiredValidator implements the RuleValidator interface for the 'required' validation type.
+type RequiredValidator struct{}
+
+// Validate checks if the variables specified in the rule are present (required) or absent (deprecated).
+func (r *RequiredValidator) Validate(
+	bp config.Blueprint,
+	mod config.Module,
+	rule modulereader.ValidationRule,
+	group config.Group,
+	modIdx int) error {
+
+	var unsetVarNames []string
+	var setVarNames []string
+
+	handler := func(t Target) error {
+		if !isVarSet(t.Values) {
+			unsetVarNames = append(unsetVarNames, t.Name)
+		} else {
+			setVarNames = append(setVarNames, t.Name)
+		}
+		return nil
+	}
+	modPath := config.Root.Groups.At(bp.GroupIndex(group.Name)).Modules.At(modIdx).Source
+
+	varsList, ok := parseStringList(rule.Inputs["vars"])
+	if !ok {
+		return config.BpError{Err: fmt.Errorf("validation rule for module %q is missing 'vars'", mod.ID), Path: modPath}
+	}
+	for _, varName := range varsList {
+		values, _, _ := getModuleSettingValues(bp, group, modIdx, mod, varName)
+
+		if err := handler(Target{Name: varName, Values: values}); err != nil {
+			return err
+		}
+	}
+
+	deprecated, err := parseBoolInput(rule.Inputs, "deprecated", false)
+	if err != nil {
+		return config.BpError{Err: fmt.Errorf("validation rule for module %q: %v", mod.ID, err), Path: modPath}
+	}
+
+	if deprecated {
+		if len(setVarNames) > 0 {
+			msg := fmt.Sprintf("unwanted settings: %s", strings.Join(setVarNames, ", "))
+			if rule.ErrorMessage != "" {
+				msg = fmt.Sprintf("%s: %s", rule.ErrorMessage, msg)
+			}
+			return config.BpError{Err: fmt.Errorf("%s", msg), Path: modPath}
+		}
+		return nil
+	}
+	if len(unsetVarNames) > 0 {
+		msg := fmt.Sprintf("missing required settings: %s", strings.Join(unsetVarNames, ", "))
+		if rule.ErrorMessage != "" {
+			msg = fmt.Sprintf("%s: %s", rule.ErrorMessage, msg)
+		}
+		return config.BpError{Err: fmt.Errorf("%s", msg), Path: modPath}
+	}
+	return nil
+}
+
+// ConditionalValidator implements the RuleValidator interface for the 'conditional' validation type.
+// It enforces that a 'dependent' variable is set or matches a value when a 'trigger' variable condition is met.
+type ConditionalValidator struct{}
+
+// Validate checks if the dependent variable satisfies the condition when the trigger variable is set.
+func (c *ConditionalValidator) Validate(
+	bp config.Blueprint,
+	mod config.Module,
+	rule modulereader.ValidationRule,
+	group config.Group,
+	modIdx int) error {
+
+	optional, _ := parseBoolInput(rule.Inputs, "optional", true)
+
+	modPath := config.Root.Groups.At(bp.GroupIndex(group.Name)).Modules.At(modIdx).Source
+
+	triggerName, ok := parseString(rule.Inputs["trigger"])
+	if !ok {
+		return config.BpError{Err: fmt.Errorf("validation rule for module %q is missing 'trigger'", mod.ID), Path: modPath}
+	}
+
+	triggerVal, _, err := getModuleSettingValues(bp, group, modIdx, mod, triggerName)
+	if err != nil {
+		if !optional {
+			return config.BpError{
+				Err:  fmt.Errorf("setting %q not found in module %q settings", triggerName, mod.ID),
+				Path: config.Root.Groups.At(bp.GroupIndex(group.Name)).Modules.At(modIdx).Settings.Dot(triggerName),
+			}
+		}
+		// If optional, treat missing trigger as Null/False
+		triggerVal = []cty.Value{cty.NilVal}
+	}
+
+	expectedRawVal, isExpectedGiven := rule.Inputs["trigger_value"]
+	triggerExpectedVal := convertToCty(expectedRawVal)
+
+	conditionMet := false
+	if !isExpectedGiven {
+		conditionMet = isVarSet(triggerVal)
+	} else {
+		conditionMet = ValuesMatch(triggerVal, evaluateAndFlatten(triggerExpectedVal))
+	}
+	if !conditionMet {
+		return nil // Condition not met; skip validation for the dependent variable.
+	}
+
+	dependentName, ok := parseString(rule.Inputs["dependent"])
+	if !ok {
+		return config.BpError{Err: fmt.Errorf("validation rule for module %q is missing 'dependent'", mod.ID), Path: modPath}
+	}
+
+	dependentVal, _, err := getModuleSettingValues(bp, group, modIdx, mod, dependentName)
+	if err != nil {
+		dependentVal = []cty.Value{cty.NilVal}
+	}
+	depExpectedRawVal, isDepExpectedGiven := rule.Inputs["dependent_value"]
+	dependentExpectedVal := convertToCty(depExpectedRawVal)
+
+	depPath := config.Root.Groups.At(bp.GroupIndex(group.Name)).Modules.At(modIdx).Settings.Dot(dependentName)
+
+	if !isDepExpectedGiven {
+		if !isVarSet(dependentVal) {
+			msg := rule.ErrorMessage
+			if msg == "" {
+				msg = fmt.Sprintf("variable %q is required when %q condition is met", dependentName, triggerName)
+			}
+			return config.BpError{Err: fmt.Errorf("%s", msg), Path: depPath}
+		}
+		return nil
+	}
+	dependentExpectedVals := evaluateAndFlatten(dependentExpectedVal)
+	if !ValuesMatch(dependentVal, dependentExpectedVals) {
+		msg := rule.ErrorMessage
+		if msg == "" {
+			msg = fmt.Sprintf("variable '%s' value doesn't match\n expected: '%s', got: '%s'",
+				dependentName, formatValue(dependentExpectedVals), formatValue(dependentVal))
+		}
+		return config.BpError{Err: fmt.Errorf("%s", msg), Path: depPath}
+	}
+
+	return nil
+}
+
+// ConditionalRegexValidator enforces that a 'dependent' variable matches or does not match
+// a regex 'pattern' when one or more 'triggers' meet their expected values.
+type ConditionalRegexValidator struct{}
+
+func (c *ConditionalRegexValidator) Validate(
+	bp config.Blueprint,
+	mod config.Module,
+	rule modulereader.ValidationRule,
+	group config.Group,
+	modIdx int,
+) error {
+	modPath := config.Root.Groups.At(bp.GroupIndex(group.Name)).Modules.At(modIdx).Source
+
+	triggers, dependent, re, matchExpected, err := parseRuleInputs(rule, string(mod.ID), modPath)
+	if err != nil {
+		return err
+	}
+
+	if !evalTriggers(bp, group, modIdx, mod, triggers) {
+		return nil
+	}
+
+	dependentVal, known, depPath, err := resolveSettingToString(bp, group, modIdx, mod, dependent, true, true)
+	if err != nil {
+		return err
+	}
+	if !known || dependentVal == "" {
+		return nil
+	}
+
+	matched := re.MatchString(dependentVal)
+	if matched != matchExpected {
+		msg := rule.ErrorMessage
+		if msg == "" {
+			if matchExpected {
+				msg = fmt.Sprintf("variable %q value %q must match pattern %q when conditions are met", dependent, dependentVal, re.String())
+			} else {
+				msg = fmt.Sprintf("variable %q value %q must not match pattern %q when conditions are met", dependent, dependentVal, re.String())
+			}
+		}
+		return config.BpError{Err: fmt.Errorf("%s", msg), Path: depPath}
+	}
+
+	return nil
+}
+
+func parseRuleInputs(rule modulereader.ValidationRule, modID string, modPath config.Path) (map[string]interface{}, string, *regexp.Regexp, bool, error) {
+	triggersRaw, ok := rule.Inputs["triggers"].(map[string]interface{})
+	if !ok {
+		trigger, ok := rule.Inputs["trigger"].(string)
+		if !ok {
+			return nil, "", nil, false, config.BpError{Err: fmt.Errorf("validation rule for module %q is missing 'triggers' or 'trigger'", modID), Path: modPath}
+		}
+		triggersRaw = map[string]interface{}{trigger: rule.Inputs["trigger_value"]}
+	}
+
+	dependentName, ok := parseString(rule.Inputs["dependent"])
+	if !ok {
+		return nil, "", nil, false, config.BpError{Err: fmt.Errorf("validation rule for module %q is missing 'dependent'", modID), Path: modPath}
+	}
+
+	patternRaw, ok := rule.Inputs["pattern"].(string)
+	if !ok || patternRaw == "" {
+		return nil, "", nil, false, config.BpError{Err: fmt.Errorf("validation rule for module %q is missing 'pattern'", modID), Path: modPath}
+	}
+
+	re, err := regexp.Compile(patternRaw)
+	if err != nil {
+		return nil, "", nil, false, config.BpError{Err: fmt.Errorf("failed to compile regex for module %q: %v", modID, err), Path: modPath}
+	}
+
+	matchExpected, err := parseBoolInput(rule.Inputs, "match_expected", true)
+	if err != nil {
+		return nil, "", nil, false, config.BpError{Err: fmt.Errorf("validation rule for module %q: %v", modID, err), Path: modPath}
+	}
+
+	return triggersRaw, dependentName, re, matchExpected, nil
+}
+
+func getSettingWithFallback(
+	bp config.Blueprint,
+	group config.Group,
+	modIdx int,
+	mod config.Module,
+	name string,
+) (cty.Value, config.Path) {
+	if vals, path, err := getModuleSettingValues(bp, group, modIdx, mod, name); err == nil && len(vals) > 0 {
+		return vals[0], path
+	}
+	path := config.Root.Groups.At(bp.GroupIndex(group.Name)).Modules.At(modIdx).Settings.Dot(name)
+	info := mod.InfoOrDie()
+	for _, input := range info.Inputs {
+		if input.Name == name {
+			if input.Default != nil {
+				return convertToCty(input.Default), path
+			}
+			break
+		}
+	}
+	return cty.NilVal, path
+}
+
+func matchTrigger(actualVal, expectedVal cty.Value) bool {
+	if actualVal == cty.NilVal || actualVal.IsNull() {
+		if !isVarSet([]cty.Value{expectedVal}) {
+			return true
+		}
+		return expectedVal != cty.NilVal && expectedVal.IsKnown() && !expectedVal.IsNull() && expectedVal.Type() == cty.Bool && expectedVal.False()
+	}
+	if !actualVal.IsKnown() || !expectedVal.IsKnown() || expectedVal == cty.NilVal {
+		return false
+	}
+	eq := actualVal.Equals(expectedVal)
+	return eq.IsKnown() && !eq.IsNull() && eq.True()
+}
+
+func evalTriggers(
+	bp config.Blueprint,
+	group config.Group,
+	modIdx int,
+	mod config.Module,
+	triggers map[string]interface{},
+) bool {
+	for name, expectedValRaw := range triggers {
+		expectedVal := convertToCty(expectedValRaw)
+		actualVal, _ := getSettingWithFallback(bp, group, modIdx, mod, name)
+		if !matchTrigger(actualVal, expectedVal) {
+			return false
+		}
+	}
+	return true
+}

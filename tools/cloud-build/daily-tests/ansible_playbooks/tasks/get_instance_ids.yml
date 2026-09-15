@@ -1,4 +1,4 @@
-# Copyright 2023 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 ---
 - name: Gather instance information
   delegate_to: localhost
-  when: deployment_name is defined and deployment_name | string
+  when: deployment_name is defined and deployment_name | length > 0
   changed_when: false
   register: instances
   until: instances.rc == 0
@@ -24,13 +24,13 @@
   ansible.builtin.command: >-
     gcloud compute instances list
     --filter="labels.ghpc_deployment={{ deployment_name }}"
-    --format='json(name,zone,id,status)'
+    --format='json(name,zone,id,status,resourceStatus.physicalHost)'
 - name: Print instance information
   when: instances is defined
   ansible.builtin.debug:
     var: instances.stdout
 - name: Print Cloud Logging command
-  when: instances is defined and instances.stdout | list
+  when: instances is defined and (instances.stdout | from_json | length > 0)
   ansible.builtin.debug:
     msg: gcloud logging --project {{ project }} read 'logName="projects/{{ project }}/logs/google_metadata_script_runner" AND resource.labels.instance_id="{{ item.id }}"' --format="table(timestamp, jsonPayload.message)" --freshness 24h | tac
-  loop: "{{ instances.stdout }}"
+  loop: "{{ instances.stdout | from_json | default([]) }}"

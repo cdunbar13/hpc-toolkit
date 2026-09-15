@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Google LLC
+Copyright 2026 Google LLC
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ limitations under the License.
 package modulewriter
 
 import (
+	"bytes"
 	"fmt"
 	"hpc-toolkit/pkg/config"
 	"hpc-toolkit/pkg/deploymentio"
@@ -414,7 +415,7 @@ func (s *zeroSuite) TestWriteVersions(c *C) {
 		c.Assert(err, IsNil)
 		c.Check(string(b), Equals, license+`
 terraform {
-  required_version = ">= 1.2"
+  required_version = ">= 1.12.2"
 
   required_providers {
     elephant = {
@@ -522,13 +523,13 @@ func (s *zeroSuite) TestDeploymentSource(c *C) {
 		m := config.Module{Kind: config.TerraformKind, Source: "modules/x/y"}
 		s, err := DeploymentSource(m)
 		c.Check(err, IsNil)
-		c.Check(s, Equals, "./modules/embedded/modules/x/y")
+		c.Check(s, Equals, "../"+config.SharedModulesDirName+"/embedded/modules/x/y")
 	}
 	{ // embedded community
 		m := config.Module{Kind: config.TerraformKind, Source: "community/modules/x/y"}
 		s, err := DeploymentSource(m)
 		c.Check(err, IsNil)
-		c.Check(s, Equals, "./modules/embedded/community/modules/x/y")
+		c.Check(s, Equals, "../"+config.SharedModulesDirName+"/embedded/community/modules/x/y")
 	}
 	{ // local rel in repo
 		m := config.Module{Kind: config.TerraformKind, Source: "./modules/x/y"}
@@ -547,6 +548,15 @@ func (s *zeroSuite) TestDeploymentSource(c *C) {
 		s, err := DeploymentSource(m)
 		c.Check(err, IsNil)
 		c.Check(s, Matches, `^\./modules/y-\w\w\w\w$`)
+	}
+	{ // equivalent paths produce same hash after cleaning
+		m1 := config.Module{Kind: config.TerraformKind, Source: "./modules/x/y"}
+		m2 := config.Module{Kind: config.TerraformKind, Source: "./modules/x/z/../y"}
+		s1, err1 := DeploymentSource(m1)
+		c.Check(err1, IsNil)
+		s2, err2 := DeploymentSource(m2)
+		c.Check(err2, IsNil)
+		c.Check(s1, Equals, s2)
 	}
 }
 
@@ -657,4 +667,56 @@ func (s *zeroSuite) TestStageFile(c *C) {
 		c.Assert(string(dat), Equals, "pulp")
 	}
 
+}
+
+func (s *zeroSuite) TestWriteGcsDestroyInstructions(c *C) {
+	bp := config.Blueprint{
+		Vars: config.NewDict(map[string]cty.Value{
+			"project_id": cty.StringVal("my-project"),
+		}),
+		Groups: []config.Group{
+			{
+				Name: "group1",
+				TerraformBackend: config.TerraformBackend{
+					Type: "gcs",
+					Configuration: config.NewDict(map[string]cty.Value{
+						"bucket": cty.StringVal("my-bucket-name"),
+					}),
+				},
+			},
+		},
+	}
+
+	buf := new(bytes.Buffer)
+	writeDestroyInstructions(buf, bp, "deployment-dir")
+	out := buf.String()
+
+	c.Check(strings.Contains(out, "my-bucket-name"), Equals, true)
+}
+
+func (s *zeroSuite) TestGetUniqueGcsBuckets_Errors(c *C) {
+	bp := config.Blueprint{
+		Groups: []config.Group{
+			{
+				Name: "group_empty",
+				TerraformBackend: config.TerraformBackend{
+					Type: "gcs",
+					Configuration: config.NewDict(map[string]cty.Value{
+						"bucket": cty.StringVal(""),
+					}),
+				},
+			},
+		},
+	}
+	_, err := GetUniqueGcsBuckets(bp)
+	c.Assert(err, NotNil)
+	c.Check(err.Error(), Equals, "GCS backend bucket name for group \"group_empty\" cannot be empty")
+
+	bp.Groups[0].Name = "group_null"
+	bp.Groups[0].TerraformBackend.Configuration = config.NewDict(map[string]cty.Value{
+		"bucket": cty.NullVal(cty.String),
+	})
+	_, err = GetUniqueGcsBuckets(bp)
+	c.Assert(err, NotNil)
+	c.Check(err.Error(), Equals, "GCS backend bucket name for group \"group_null\" cannot be empty or unknown")
 }

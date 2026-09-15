@@ -1,5 +1,5 @@
 /**
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ terraform {
   required_providers {
     google = {
       source  = "hashicorp/google"
-      version = ">= 6.27.0"
+      version = ">= 7.27.0"
     }
     random = {
       source  = "hashicorp/random"
@@ -26,11 +26,11 @@ terraform {
     }
   }
   provider_meta "google" {
-    module_name = "blueprints/terraform/hpc-toolkit:managed-lustre/v1.52.0"
+    module_name = "blueprints/terraform/hpc-toolkit:managed-lustre/v1.103.0"
   }
   provider_meta "google-beta" {
-    module_name = "blueprints/terraform/hpc-toolkit:managed-lustre/v1.52.0"
+    module_name = "blueprints/terraform/hpc-toolkit:managed-lustre/v1.103.0"
   }
 
-  required_version = ">= 1.3.0"
+  required_version = ">= 1.12.2"
 }

@@ -1,4 +1,4 @@
-# Copyright 2025 "Google LLC"
+# Copyright 2026 "Google LLC"
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -100,9 +100,7 @@ class PullToArtifactRegistryView(LoginRequiredMixin, BackendAsyncView):
 
     def cmd(self, unused_task_id, unused_token, registry, source_uri, tag, registry_username, registry_password):
         try:
-            from google.cloud.devtools import cloudbuild_v1
             from google.oauth2 import service_account
-            from google.protobuf import duration_pb2
 
             dest_image = self.normalize_dest_image_sync(registry, source_uri, tag)
             logger.info(f"Destination image: {dest_image}")

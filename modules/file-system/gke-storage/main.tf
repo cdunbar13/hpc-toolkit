@@ -1,5 +1,5 @@
 /**
-  * Copyright 2024 Google LLC
+  * Copyright 2026 Google LLC
   *
   * Licensed under the Apache License, Version 2.0 (the "License");
   * you may not use this file except in compliance with the License.
@@ -30,9 +30,16 @@ check "private_vpc_connection_peering" {
     condition     = lower(var.storage_type) != "parallelstore" ? true : var.private_vpc_connection_peering != null
     error_message = <<-EOT
     Parallelstore must be run within the same VPC as the GKE cluster and have private services access enabled.
-    If using new VPC, please use community/modules/network/private-service-access to create private-service-access.
+    If using new VPC, please use modules/network/private-service-access to create private-service-access.
     If using existing VPC with private-service-access enabled, set this manually follow [user guide](https://cloud.google.com/parallelstore/docs/vpc).
     EOT
+  }
+}
+
+check "storage_pool_supported_types" {
+  assert {
+    condition     = var.disk_storage_pool == null || var.disk_storage_pool == "" || contains(["hyperdisk-balanced", "hyperdisk-throughput"], lower(var.storage_type))
+    error_message = "Storage pools are only supported with Hyperdisk types (balanced or throughput)."
   }
 }
 
@@ -50,13 +57,25 @@ module "kubectl_apply" {
         content = templatefile(
           "${path.module}/storage-class/${local.storage_class_name}.yaml.tftpl",
           {
-            name                = local.storage_class_name
-            labels              = local.labels
-            volume_binding_mode = var.sc_volume_binding_mode
-            reclaim_policy      = var.sc_reclaim_policy
-            topology_zones      = var.sc_topology_zones
+            name                        = local.storage_class_name
+            labels                      = local.labels
+            volume_binding_mode         = var.sc_volume_binding_mode
+            reclaim_policy              = var.sc_reclaim_policy
+            topology_zones              = var.sc_topology_zones
+            enable_confidential_storage = var.enable_confidential_storage
+            disk_encryption_kms_key     = var.disk_encryption_kms_key
+            disk_storage_pool           = var.disk_storage_pool
         })
+        wait_for_rollout = false
       },
+      var.namespace != "default" ? [{
+        content = templatefile(
+          "${path.module}/persistent-volume-claim/namespace.yaml.tftpl",
+          {
+            namespace = var.namespace
+        })
+        wait_for_rollout = false
+      }] : [],
       # create PersistentVolumeClaim in the cluster
       flatten([
         for idx in range(var.pvc_count) : [
@@ -69,10 +88,21 @@ module "kubectl_apply" {
                 capacity           = "${var.capacity_gb}Gi"
                 access_mode        = var.access_mode
                 storage_class_name = local.storage_class_name
+                namespace          = var.namespace
               }
             )
+            wait_for_rollout = false
           }
         ]
       ])
   ])
+}
+
+resource "terraform_data" "validate_confidential_storage" {
+  lifecycle {
+    precondition {
+      condition     = !var.enable_confidential_storage || (var.disk_encryption_kms_key != null && var.disk_encryption_kms_key != "")
+      error_message = "Confidential Storage requires a Customer-Managed Encryption Key (CMEK). Please provide a valid 'disk_encryption_kms_key'."
+    }
+  }
 }

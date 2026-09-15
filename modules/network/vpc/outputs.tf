@@ -1,5 +1,5 @@
 /**
- * Copyright 2022 Google LLC
+ * Copyright 2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -62,7 +62,19 @@ output "subnetwork_address" {
   depends_on  = [module.vpc, module.cloud_router]
 }
 
+output "subnetwork_stack_type" {
+  description = "Stack type of the primary subnetwork"
+  value       = local.output_primary_subnetwork_stack_type
+  depends_on  = [module.vpc, module.cloud_router]
+}
+
 output "nat_ips" {
   description = "External IPs of the Cloud NAT from which outbound internet traffic will arrive (empty list if no NAT is used)"
   value       = flatten([for ipmod in module.nat_ip_addresses : ipmod.addresses])
+}
+
+output "instance_additional_networks" {
+  description = "Network interface details compatible with gke-node-pool additional_networks"
+  value       = local.output_subnets_gke
+  depends_on  = [module.vpc, module.cloud_router]
 }

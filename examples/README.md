@@ -17,56 +17,78 @@ md_toc github examples/README.md | sed -e "s/\s-\s/ * /"
   * [(Optional) Setting up a remote terraform state](#optional-setting-up-a-remote-terraform-state)
 * [Blueprint Descriptions](#blueprint-descriptions)
   * [hpc-slurm.yaml](#hpc-slurmyaml-) ![core-badge]
+  * [hpc-slurm-ha.yaml](#hpc-slurm-hayaml-) ![community-badge]
   * [hpc-enterprise-slurm.yaml](#hpc-enterprise-slurmyaml-) ![core-badge]
-  * [hpc-slurm-static.yaml](#hpc-slurm-staticyaml-) ![core-badge]
   * [hpc-slurm6-tpu.yaml](#hpc-slurm6-tpuyaml--) ![community-badge] ![experimental-badge]
   * [hpc-slurm6-tpu-maxtext.yaml](#hpc-slurm6-tpu-maxtextyaml--) ![community-badge] ![experimental-badge]
   * [hpc-slurm6-apptainer.yaml](#hpc-slurm6-apptaineryaml--) ![community-badge] ![experimental-badge]
+  * [apptainer-artifact-registry-openfoam.yaml](#apptainer-artifact-registry-openfoamyaml--) ![community-badge] ![experimental-badge]
   * [ml-slurm.yaml](#ml-slurmyaml-) ![core-badge]
+  * [ml-slurm-g4.yaml](#ml-slurm-g4yaml-) ![core-badge]
+  * [ml-slurm-g4-vgpu.yaml](#ml-slurm-g4-vgu-yaml-) ![community-badge] ![experimental-badge]
   * [h4d-vm.yaml](#h4d-vmyaml--) ![core-badge] ![experimental-badge]
   * [image-builder.yaml](#image-builderyaml-) ![core-badge]
-  * [serverless-batch.yaml](#serverless-batchyaml-) ![core-badge]
-  * [serverless-batch-mpi.yaml](#serverless-batch-mpiyaml-) ![core-badge]
-  * [pfs-lustre.yaml](#pfs-lustreyaml-) ![core-badge] ![deprecated-badge]
-  * [pfs-managed-lustre-vms.yaml](#pfs-managed-lustre-vmsyaml-) ![core-badge]
-  * [ps-slurm.yaml](#ps-slurmyaml--) ![core-badge] ![experimental-badge]
-  * [pfs-parallelstore.yaml](#pfs-parallelstoreyaml--) ![core-badge] ![experimental-badge]
+  * [batch.yaml](#batchyaml-) ![core-badge]
+  * [batch-mpi.yaml](#batch-mpiyaml-) ![core-badge]
+  * [pfs-managed-lustre-vm.yaml](#pfs-managed-lustre-vmyaml-) ![core-badge]
+  * [pfs-managed-lustre-slurm.yaml](#pfs-managed-lustre-slurmyaml-) ![core-badge]
+  * [storage-slurm.yaml](#storage-slurmyaml-) ![core-badge]
+  * [gke-managed-lustre.yaml](#gke-managed-lustreyaml-) ![core-badge]
   * [cae-slurm.yaml](#cae-slurmyaml-) ![core-badge]
   * [hpc-build-slurm-image.yaml](#hpc-build-slurm-imageyaml--) ![community-badge] ![experimental-badge]
-  * [hpc-slurm-ubuntu2004.yaml](#hpc-slurm-ubuntu2004yaml--) ![community-badge]
+  * [hpc-slurm-ubuntu2204.yaml](#hpc-slurm-ubuntu2204yaml-) ![community-badge]
   * [hpc-amd-slurm.yaml](#hpc-amd-slurmyaml-) ![community-badge]
   * [hpc-slurm-sharedvpc.yaml](#hpc-slurm-sharedvpcyaml--) ![community-badge] ![experimental-badge]
   * [client-google-cloud-storage.yaml](#client-google-cloud-storageyaml--) ![community-badge] ![experimental-badge]
   * [hpc-slurm-gromacs.yaml](#hpc-slurm-gromacsyaml--) ![community-badge] ![experimental-badge]
   * [hpc-slurm-local-ssd.yaml](#hpc-slurm-local-ssdyaml--) ![community-badge] ![experimental-badge]
-  * [hpc-slurm-h4d.yaml](#hpc-slurm-h4dyaml--) ![community-badge] ![experimental-badge]
+  * [hpc-slurm-h4d.yaml](#hpc-slurm-h4dyaml-) ![core-badge]
+  * [hpc-slinky.yaml](#hpc-slinkyyaml--) ![community-badge] ![experimental-badge]
   * [hcls-blueprint.yaml](#hcls-blueprintyaml-) ![core-badge]
+  * [af3-slurm.yaml](#af3-slurmyaml--) ![core-badge] ![experimental-badge]
   * [hpc-gke.yaml](#hpc-gkeyaml-) ![core-badge]
   * [ml-gke](#ml-gkeyaml-) ![core-badge]
-  * [storage-gke](#storage-gkeyaml-) ![core-badge]
+  * [storage-gke.yaml](#storage-gkeyaml-) ![core-badge]
+  * [storage-vm.yaml](#storage-vmyaml-) ![core-badge]
   * [gke-managed-hyperdisk.yaml](#gke-managed-hyperdiskyaml--) ![core-badge] ![experimental-badge]
-  * [gke-managed-parallelstore.yaml](#gke-managed-parallelstoreyaml--) ![core-badge] ![experimental-badge]
   * [gke-a3-ultragpu.yaml](#gke-a3-ultragpuyaml-) ![core-badge]
   * [gke-a3-megagpu](#gke-a3-megagpuyaml-) ![core-badge]
   * [gke-a3-highgpu](#gke-a3-highgpuyaml-) ![core-badge]
+  * [gke-a3-highgpu-inference-gateway.yaml](#gke-a3-highgpu-inference-gatewayyaml-) ![core-badge]
   * [gke-consumption-options](#gke-consumption-options-) ![core-badge]
   * [htc-slurm.yaml](#htc-slurmyaml-) ![community-badge]
   * [htc-htcondor.yaml](#htc-htcondoryaml--) ![community-badge] ![experimental-badge]
-  * [fsi-montecarlo-on-batch.yaml](#fsi-montecarlo-on-batchyaml-) ![community-badge] ![experimental-badge]
+  * [fsi-montecarlo-on-batch.yaml](#fsi-montecarlo-on-batchyaml--) ![community-badge] ![experimental-badge]
   * [tutorial-starccm-slurm.yaml](#tutorial-starccm-slurmyaml--) ![community-badge] ![experimental-badge]
   * [tutorial-starccm.yaml](#tutorial-starccmyaml--) ![community-badge] ![experimental-badge]
   * [hpc-slurm-ramble-gromacs.yaml](#hpc-slurm-ramble-gromacsyaml--) ![community-badge] ![experimental-badge]
   * [flux-cluster](#flux-clusteryaml--) ![community-badge] ![experimental-badge]
+  * [hpc-slurm-kms.yaml](#hpc-slurm-kmsyaml--) ![community-badge] ![experimental-badge]
   * [tutorial-fluent.yaml](#tutorial-fluentyaml--) ![community-badge] ![experimental-badge]
-  * [gke-tpu-v6](#gke-tpu-v6--) ![community-badge] ![experimental-badge]
+  * [gke-tpu-v4](#gke-tpu-v4-) ![core-badge]
+  * [gke-tpu-v5e](#gke-tpu-v5e-) ![core-badge]
+  * [gke-tpu-v5p](#gke-tpu-v5p-) ![core-badge]
+  * [gke-tpu-v6e](#gke-tpu-v6e-) ![core-badge]
   * [xpk-n2-filestore](#xpk-n2-filestore--) ![community-badge] ![experimental-badge]
+  * [gke-h4d](#gke-h4d-) ![core-badge]
+  * [gke-g4](#gke-g4-) ![core-badge]
+  * [gke-g4-confidential](#gke-g4-confidential-) ![core-badge]
+  * [gke-a4](#gke-a4-) ![core-badge]
+  * [gke-a4x](#gke-a4x-) ![core-badge]
+  * [gke-a4x-max-bm](#gke-a4x-max-bm-) ![core-badge]
+  * [netapp-volumes.yaml](#netapp-volumesyaml-) ![core-badge]
+  * [gke-tpu-7x](#gke-tpu-7x-) ![core-badge]
+  * [gcloud-example.yaml](#gcloud-exampleyaml--) ![community-badge] ![experimental-badge]
+  * [eda-all-on-cloud.yaml](#eda-all-on-cloudyaml-) ![community-badge]
+  * [eda-hybrid-cloud.yaml](#eda-hybrid-cloudyaml-) ![community-badge]
+  * [hpc-slurm-google-cloud-dedicated.yaml](#hpc-slurm-google-cloud-dedicatedyaml-) ![community-badge]
 * [Blueprint Schema](#blueprint-schema)
 * [Writing an HPC Blueprint](#writing-an-hpc-blueprint)
   * [Blueprint Boilerplate](#blueprint-boilerplate)
   * [Top Level Parameters](#top-level-parameters)
   * [Deployment Variables](#deployment-variables)
   * [Deployment Groups](#deployment-groups)
-* [Variables and expressions](#variables-and-expressions)
+* [Variables, expressions, and functions](#variables-expressions-and-functions)
 
 ## Instructions
 
@@ -132,8 +154,10 @@ subcommands as well:
 > in both the blueprint and CLI, the tool uses values at CLI. "gcs" is set as
 > type by default.
 
-[terraform backends]: https://developer.hashicorp.com/terraform/language/settings/backends/configuration
-[configuration block]: https://developer.hashicorp.com/terraform/language/settings/backends/configuration#using-a-backend-block
+**Note:** GCS buckets created for Terraform state are not deleted by the `./gcluster destroy` command and must be deleted manually.
+
+[terraform backends]: https://developer.hashicorp.com/terraform/language/backend
+[configuration block]: https://developer.hashicorp.com/terraform/language/backend#define-a-backend-block
 [gcs]: https://developer.hashicorp.com/terraform/language/settings/backends/gcs
 
 ## Blueprint Descriptions
@@ -206,6 +230,16 @@ For this example the following is needed in the selected region:
 * Compute Engine API: Resource policies: **one for each job in parallel** -
   _only needed for the `compute` partition_
 
+### [hpc-slurm-ha.yaml] ![community-badge]
+
+Creates a highly available (HA) Slurm cluster. This setup includes a primary controller
+and a backup controller to ensure control plane resilience. If the primary controller
+instance fails, the Slurm services can be failed over to the backup controller, minimizing
+downtime. This blueprint configures the necessary shared storage and network settings to
+support the HA configuration.
+
+[hpc-slurm-ha.yaml]: ./hpc-slurm-ha.yaml
+
 ### [hpc-enterprise-slurm.yaml] ![core-badge]
 
 This advanced blueprint creates a cluster with Slurm with several performance
@@ -215,7 +249,7 @@ these features come with additional cost and required additional quotas.
 The Slurm system deployed here connects to the default VPC of the project and
 creates a  login node and the following seven partitions:
 
-* `n2` with general-purpose [`n2-stardard-2` nodes][n2]. Placement policies and
+* `n2` with general-purpose [`n2-standard-2` nodes][n2]. Placement policies and
 exclusive usage are disabled, which means the nodes can be used for multiple jobs.
 Nodes will remain idle for 5 minutes before Slurm deletes them. This partition can
 be used for debugging and workloads that do not require high performance.
@@ -259,14 +293,7 @@ File systems:
   2.5 TiB of capacity
 * The projectsfs is mounted at `/projects` and is a high scale SSD filestore
   instance with 10TiB of capacity.
-* The scratchfs is mounted at `/scratch` and is a
-  [DDN Exascaler Lustre](../community/modules/file-system/DDN-EXAScaler/README.md)
-  file system designed for high IO performance. The capacity is ~10TiB.
-
-> [!WARNING]
-> This module is deprecated and will be removed on July 1, 2025. The
-> recommended replacement is the
-> [GCP Managed Lustre module](../../../../modules/file-system/managed-lustre/README.md)
+* The lustre-gcp is mounted at /lustre and is designed for the highly parallel and random I/O performance. It has a minimum capacity of ~18TiB. [GCP Managed Lustre module](../modules/file-system/managed-lustre/README.md)
 
 #### Quota Requirements for hpc-enterprise-slurm.yaml
 
@@ -297,35 +324,6 @@ to 256
 
 [hpc-enterprise-slurm.yaml]: ./hpc-enterprise-slurm.yaml
 
-### [hpc-slurm-static.yaml] ![core-badge]
-
-This example demonstrates how to create a partition with static compute nodes.
-See [Best practices for static compute nodes] for instructions on setting up a
-reservation and compact placement policy.
-
-Before deploying this example the following fields must be populated in the bluerpint:
-
-```yaml
-  project_id: ## Set GCP Project ID Here ##
-  static_reservation_name:  ## Set your reservation name here ##
-  static_reservation_machine_type: ## Machine must match reservation above ##
-  static_node_count: ## Must be <= number of reserved machines ##
-```
-
-For more resources on static compute nodes see the following cloud docs pages:
-
-* [About [Slurm] node types](https://cloud.google.com/cluster-toolkit/docs/slurm/node-types)
-* [Best practices for static compute nodes]
-* [Reconfigure a running cluster](http://cloud/cluster-toolkit/docs/slurm/reconfigure-cluster)
-* [Manage static compute nodes](http://cloud/cluster-toolkit/docs/slurm/manage-static-nodes)
-
-For a similar, more advanced, example which demonstrates static node
-functionality with GPUs, see the
-[ML Slurm A3 example](./machine-learning/README.md).
-
-[Best practices for static compute nodes]: http://cloud/cluster-toolkit/docs/slurm/static-nodes-best-practices
-[hpc-slurm-static.yaml]: ./hpc-slurm-static.yaml
-
 ### [hpc-slurm6-tpu.yaml] ![community-badge] ![experimental-badge]
 
 Creates an auto-scaling Slurm cluster with TPU nodes.
@@ -345,9 +343,15 @@ Follow [hpc-slurm-tpu-maxtext].
 
 ### [hpc-slurm6-apptainer.yaml] ![community-badge] ![experimental-badge]
 
-This blueprint creates a custom [Apptainer](https:https://apptainer.org) enabled image and builds an auto-scaling Slurm cluster using that image. You can deploy containerized workloads on that cluster as described [here](https://github.com/GoogleCloudPlatform/scientific-computing-examples/tree/main/apptainer).
+This blueprint creates a custom [Apptainer](https://apptainer.org) enabled image and builds an auto-scaling Slurm cluster using that image. You can deploy containerized workloads on that cluster as described [here](https://github.com/GoogleCloudPlatform/scientific-computing-examples/tree/main/apptainer).
 
 [hpc-slurm6-apptainer.yaml]: ../community/examples/hpc-slurm6-apptainer.yaml
+
+### [apptainer-artifact-registry-openfoam.yaml] ![community-badge] ![experimental-badge]
+
+This blueprint demonstrates staging and running an [Apptainer](https://apptainer.org) SIF image through the `apptainer-runtime` and `apptainer-app` modules, backed by an [artifact-registry](../community/modules/container/artifact-registry/README.md) repository configured as a `REMOTE_REPOSITORY` pull-through cache mirroring Docker Hub. The example stages OpenFOAM from the public OpenCFD image.
+
+[apptainer-artifact-registry-openfoam.yaml]: ../community/examples/apptainer-artifact-registry-openfoam.yaml
 
 ### [h4d-vm.yaml] ![core-badge] ![experimental-badge]
 
@@ -404,6 +408,31 @@ timestamp for uniqueness.
 
 [ml-slurm.yaml]: ../examples/ml-slurm.yaml
 
+### [ml-slurm-g4.yaml] ![core-badge]
+
+This blueprint deploys a high-performance computing (HPC) cluster featuring a Slurm scheduler, optimized for machine learning workloads.
+
+Before deploying the blueprint, ensure you are utilizing one of the provision models specified within the blueprint.
+
+To provision the cluster, please run:
+
+```text
+./gcluster create examples/ml-slurm-g4.yaml --vars "project_id=${GOOGLE_CLOUD_PROJECT}"
+./gcluster deploy <deployment_name>
+```
+
+When you are done, clean up the resources:
+
+```text
+./gcluster destroy <DEPLOYMENT_FOLDER> --auto-approve
+```
+
+[ml-slurm-g4.yaml]: ../examples/ml-slurm-g4.yaml
+
+### [ml-slurm-g4-vgpu.yaml](./ml-slurm-g4-vgpu.yaml) ![community-badge] ![experimental-badge]
+
+This blueprint creates a Slurm cluster on Google Cloud optimized for machine learning workloads using **NVIDIA G4 vGPUs** (Fractional GPUs). It automates the installation of the necessary NVIDIA GRID drivers and configures Slurm to recognize the fractional GPU resources, making it suitable for cost-effective ML development and inference tasks.
+
 ### [image-builder.yaml] ![core-badge]
 
 This blueprint uses the [Packer template module][pkr] to create a custom VM
@@ -421,13 +450,29 @@ example takes the following steps:
 4. Deploys a Slurm cluster using the custom image (see
 [Slurm Cluster Based on Custom Image](#slurm-cluster-based-on-custom-image-deployment-group-3)).
 
+#### Quota Requirements for image-builder.yaml
+
+For this example the following is needed in the selected region:
+
+* Compute Engine API: Images (global, not regional quota): 1 image per invocation of `packer build`
+* Compute Engine API: Persistent Disk SSD (GB): **~50 GB**
+* Compute Engine API: Persistent Disk Standard (GB): **~64 GB static + 32
+  GB/node** up to 704 GB
+* Compute Engine API: N2 CPUs: **4** (for short-lived Packer VM and Slurm login node)
+* Compute Engine API: C2 CPUs: **4** for controller node and **60/node** active
+  in `compute` partition up to 1,204
+* Compute Engine API: Affinity Groups: **one for each job in parallel** - _only
+  needed for `compute` partition_
+* Compute Engine API: Resource policies: **one for each job in parallel** -
+  _only needed for `compute` partition_
+
 #### Building and using the custom image
 
 Create the deployment folder from the blueprint:
 
 ```text
 ./gcluster create examples/image-builder.yaml --vars "project_id=${GOOGLE_CLOUD_PROJECT}"
-./gcluster deploy image-builder-v6-001"
+./gcluster deploy image-builder-v6-001
 ```
 
 Follow the on-screen prompts to approve the creation of each deployment group.
@@ -435,28 +480,15 @@ For example, the network is created in the first deployment group, the VM image
 is created in the second group, and the third group uses the image to create an
 HPC cluster using the Slurm scheduler.
 
-When you are done, clean up the resources in reverse order of creation:
-
-```text
-terraform -chdir=image-builder-v6-001/cluster destroy --auto-approve
-terraform -chdir=image-builder-v6-001/primary destroy --auto-approve
-```
-
-Finally, browse to the [Cloud Console][console-images] to delete your custom
-image. It will be named beginning with `my-slurm-image` followed by a date and
-timestamp for uniqueness.
-
-[console-images]: https://console.cloud.google.com/compute/images
-
 #### Why use a custom image?
 
 Using a custom VM image can be more scalable and reliable than installing
 software using boot-time startup scripts because:
 
-* it avoids reliance on continued availability of package repositories
+* It avoids reliance on continued availability of package repositories.
 * VMs will join an HPC cluster and execute workloads more rapidly due to reduced
-  boot-time configuration
-* machines are guaranteed to boot with a static software configuration chosen
+  boot-time configuration.
+* Machines are guaranteed to boot with a static software configuration chosen
   when the custom image was created. No potential for some machines to have
   different software versions installed due to `apt`/`yum`/`pip` installations
   executed after remote repositories have been updated.
@@ -504,32 +536,30 @@ Once the Slurm cluster has been deployed we can test that our Slurm compute
 partition is using the custom image. Each compute node should contain the
 `hello.txt` file added by the startup-script.
 
-1. SSH into the login node `imagebuild-login-login-001`.
+1. SSH into the login node `imagebuild-slurm-login-001`.
 2. Run a job that prints the contents of the added file:
 
   ```bash
-  $ srun -N 2 cat /home/hello.txt
+  $ srun -N 2 cat /usr/local/hello.txt
   Hello World
   Hello World
   ```
 
-#### Quota Requirements for image-builder.yaml
+To avoid recurring charges for the resources provisioned by Cluster Toolkit, clean up the resources using the following command:
 
-For this example the following is needed in the selected region:
+```text
+./gcluster destroy image-builder-v6-001
+```
 
-* Compute Engine API: Images (global, not regional quota): 1 image per invocation of `packer build`
-* Compute Engine API: Persistent Disk SSD (GB): **~50 GB**
-* Compute Engine API: Persistent Disk Standard (GB): **~64 GB static + 32
-  GB/node** up to 704 GB
-* Compute Engine API: N2 CPUs: **4** (for short-lived Packer VM and Slurm login node)
-* Compute Engine API: C2 CPUs: **4** for controller node and **60/node** active
-  in `compute` partition up to 1,204
-* Compute Engine API: Affinity Groups: **one for each job in parallel** - _only
-  needed for `compute` partition_
-* Compute Engine API: Resource policies: **one for each job in parallel** -
-  _only needed for `compute` partition_
+Follow the on-screen prompts to approve the deletion of each deployment group. For example, the resources are removed in reverse order. The cluster is destroyed first, followed by the primary is destroyed in the deployment group.
 
-### [serverless-batch.yaml] ![core-badge]
+Finally, browse to the [Cloud Console][console-images] to delete your custom
+image. It will be named beginning with `my-slurm-image` followed by a date and
+timestamp for uniqueness.
+
+[console-images]: https://console.cloud.google.com/compute/images
+
+### [batch.yaml] ![core-badge]
 
 This example demonstrates how to use the Cluster Toolkit to set up a Google Cloud Batch job
 that mounts a Filestore instance and runs startup scripts.
@@ -541,9 +571,22 @@ renders a Google Cloud Batch job template. A login node VM is created with
 instructions on how to SSH to the login node and submit the Google Cloud Batch
 job.
 
-[serverless-batch.yaml]: ../examples/serverless-batch.yaml
+To provision the cluster, please run:
 
-### [serverless-batch-mpi.yaml] ![core-badge]
+```text
+./gcluster create examples/batch.yaml --vars "project_id=${GOOGLE_CLOUD_PROJECT}"
+./gcluster deploy hello-workload
+```
+
+When you are done, clean up the resources in reverse order of creation:
+
+```text
+./gcluster destroy hello-workload
+```
+
+[batch.yaml]: ../examples/batch.yaml
+
+### [batch-mpi.yaml] ![core-badge]
 
 This blueprint demonstrates how to use Spack to run a real MPI job on Batch.
 
@@ -557,6 +600,11 @@ The blueprint contains the following:
 * A builder `vm-instance` which performs the Spack install and then shuts down.
 * A `batch-job-template` that builds a Batch job to execute the WRF job.
 * A `batch-login` VM that can be used to test and submit the Batch job.
+
+> **_NOTE:_** **Multi-Node Architecture:** This blueprint provisions a single login node and a multi-node compute cluster (defaulting to 2 compute nodes).
+>
+> * **Login Node:** A single VM instance used to install software, stage data, and submit jobs.
+> * **Compute Nodes:** Dynamically provisioned when the job is submitted, based on the `batch-job` module settings.
 
 **Usage instructions:**
 
@@ -598,52 +646,9 @@ The blueprint contains the following:
     job has finished this folder will contain the results of the job. You can
     inspect the `rsl.out.0000` file for a summary of the job.
 
-[serverless-batch-mpi.yaml]: ../examples/serverless-batch-mpi.yaml
+[batch-mpi.yaml]: ../examples/batch-mpi.yaml
 
-### [pfs-lustre.yaml] ![core-badge] ![deprecated-badge]
-
-_This blueprint has been deprecated and will be removed on August 1, 2025._
-
-Creates a DDN EXAScaler lustre file-system that is mounted in two client instances.
-
-The [DDN Exascaler Lustre](../community/modules/file-system/DDN-EXAScaler/README.md)
-file system is designed for high IO performance. It has a default capacity of
-~10TiB and is mounted at `/lustre`.
-
-> **Warning**: The DDN Exascaler Lustre file system has a license cost as
-> described in the pricing section of the
-> [DDN EXAScaler Cloud Marketplace Solution](https://console.developers.google.com/marketplace/product/ddnstorage/).
-
-After the creation of the file-system and the client instances, the startup
-scripts on the client instances will automatically install the lustre drivers,
-configure the mount-point, and mount the file system to the specified
-directory. This may take a few minutes after the VMs are created and can be
-verified by running:
-
-```sh
-watch df
-```
-
-Eventually you should see a line similar to:
-
-```sh
-<IP>:<remote_mount>  lustre   100G   15G  85G  15% <local_mount>
-```
-
-with remote_mount, and local_mount reflecting the settings of the module and
-IP being set to the lustre instance's IP.
-
-#### Quota Requirements for pfs-lustre.yaml
-
-For this example the following is needed in the selected region:
-
-* Compute Engine API: Persistent Disk SSD (GB): **~14TB: 3500GB MDT, 3500GB OST[0-2]**
-* Compute Engine API: Persistent Disk Standard (GB): **~756GB: 20GB MDS, 276GB MGS, 3x20GB OSS, 2x200GB client-vms**
-* Compute Engine API: N2 CPUs: **~116: 32 MDS, 32 MGS, 3x16 OSS, 2x2 client-vms**
-
-[pfs-lustre.yaml]: ./pfs-lustre.yaml
-
-### [pfs-managed-lustre-vms.yaml] ![core-badge]
+### [pfs-managed-lustre-vm.yaml] ![core-badge]
 
 Creates a Managed Lustre file-system that is mounted in one client instance.
 
@@ -669,7 +674,7 @@ Eventually you should see a line similar to:
 with remote_mount, and local_mount reflecting the settings of the module and
 IP being set to the lustre instance's IP.
 
-#### Quota Requirements for pfs-managed-lustre.yaml
+#### Quota Requirements for pfs-managed-lustre-vm.yaml
 
 For this example, the following is needed in the selected region:
 
@@ -679,80 +684,181 @@ For this example, the following is needed in the selected region:
 * Compute Engine API: N2 CPUs: **~34: 32 MGS, 2 client-vm**
 * Compute Engine API: C3 CPUs: **~396: 44 MDS, 2*176 OSS**
 
-[pfs-managed-lustre-vms.yaml]: ./pfs-managed-lustre-vms.yaml
+[pfs-managed-lustre-vm.yaml]: ./pfs-managed-lustre-vm.yaml
 
-### [ps-slurm.yaml] ![core-badge] ![experimental-badge]
+### [pfs-managed-lustre-slurm.yaml] ![core-badge]
 
-Creates a Slurm cluster with [Parallelstore] instance mounted.
+This blueprint, managed-lustre-slurm, is a specialized configuration designed to deploy a high-performance compute cluster on Google Cloud. It integrates the Slurm Workload Manager with Google Cloud Managed Service for Lustre, a fully managed, POSIX-compliant parallel file system optimized for the massive I/O demands of AI/ML training and scientific simulations.
 
-To provision the cluster, please run:
+Creates a Managed Lustre file-system that is mounted on the slurm cluster controller instance.
 
-```text
-./gcluster deploy examples/ps-slurm.yaml --vars "project_id=${GOOGLE_CLOUD_PROJECT}"
-```
+The [GCP Managed Lustre](../modules/file-system/managed-lustre/README.md)
+file system is designed for high IO performance. For further information, refer the official documentation [Performance tiers and maximum storage capacities](https://docs.cloud.google.com/managed-lustre/docs/create-instance#performance-tiers)
 
-After cluster is deployed, parallelstore drivers and DAOS client will be installed
-and mount-point will be configured on the VMs. You can SSH to login/ controller
-and verify by running:
-
-```sh
-df -H
-```
-
-This would show `dfuse` file system being attached at `/parallelstore` mount-point.
-
-#### Quota Requirements for ps-slurm.yaml
-
-To get access to a private preview of Parallelstore APIs, your project needs to
-be allowlisted. To set this up, please work with your account representative.
-
-For this example the following is needed in the selected region:
-
-* Cloud Parallelstore API: capacity (GB) per region: 12000 GB
-* Compute Engine API: Persistent Disk SSD (GB): ~100 GB for controller and login node.
-* Compute Engine API: Persistent Disk Standard (GB): 50 GB/node up to 200 GB.
-* Compute Engine API: N2 CPUs: 2 for the login node and 2/node active in the `debug` partition.
-* Compute Engine API: C2 CPUs: 4 for the controller node.
-* Compute Engine API: C2 CPUs: 60/node active in the `debug` partition up to 240.
-
-[ps-slurm.yaml]: ./ps-slurm.yaml
-[Parallelstore]: ../modules/file-system/parallelstore/README.md
-
-### [pfs-parallelstore.yaml] ![core-badge] ![experimental-badge]
-
-This creates 1 compute VM running debian 12 and 1 compute VM running ubuntu 20.04
-and connect with [Parallelstore] instance mounted.
-
-To provision the cluster, please run:
+To provision the cluster, run the following command. You will be prompted to approve each deployment group.
 
 ```text
-./gcluster deploy examples/pfs-parallelstore.yaml --vars "project_id=${GOOGLE_CLOUD_PROJECT}"
+./gcluster deploy examples/pfs-managed-lustre-slurm.yaml --vars "project_id=${GOOGLE_CLOUD_PROJECT}"
 ```
 
-After cluster is deployed, parallelstore drivers and DAOS client will be installed
-and mount-point will be configured on the VMs. You can SSH to compute VM
-and verify by running:
+To destroy the cluster,Run below command:
 
-```sh
-df -H
+```text
+./gcluster destroy <deployment_name>
 ```
 
-This would show `dfuse` file system being attached at `/parallelstore` mount-point.
+[pfs-managed-lustre-slurm.yaml]: ./pfs-managed-lustre-slurm.yaml
+### [storage-slurm.yaml] ![core-badge]
 
-#### Quota Requirements for pfs-parallelstore.yaml
+This blueprint showcases the integration of several storage solutions:
 
-To get access to a private preview of Parallelstore APIs, your project needs to
-be allowlisted. To set this up, please work with your account representative.
+* **Google Cloud Storage (GCS):**
+  * The `data-bucket-zonal` module defines a GCS bucket configured with the `RAPID` storage class and `enable_hierarchical_namespace: true` for high-performance, zonal storage. More details on the [RAPID Bucket Cloud Docs](https://docs.cloud.google.com/storage/docs/rapid/rapid-bucket).
+  * **Anywhere Cache Support:** This blueprint also highlights support for [Anywhere Cache](https://cloud.google.com/storage/docs/anywhere-cache), a fully managed service that caches Cloud Storage data in Google Cloud. This improves read performance by co-locating cached data with compute resources.
+    * Note: A maximum of one cache per zone can be created for each bucket. For example, a bucket in `us-east1` can have caches in `us-east1-b` and `us-east1-c`.
+    * Refer to [Create a Cache](https://docs.cloud.google.com/storage/docs/anywhere-cache#create_a_cache) for more parameter details.
 
-For this example the following is needed in the selected region:
+* **Hyperdisk Storage Pools:**
+  * The `schedmd-slurm-gcp-v6-controller`, `schedmd-slurm-gcp-v6-login`, and `schedmd-slurm-gcp-v6-nodeset` modules attach persistent disks directly from pre-provisioned `hyperdisk-balanced` and `hyperdisk-throughput` Storage Pools, allowing you to share IOPS and throughput capacity across the cluster.
 
-* Cloud Parallelstore API: capacity (GB) per region: 12000 GB
-* Compute Engine API: Persistent Disk Standard (GB): ~100 GB static.
-* Compute Engine API: N2 CPUs: 112 for the compute VM running debian 12.
-* Compute Engine API: N2 CPUs: 112 for the compute VM running ubuntu 22.04.
+[storage-slurm.yaml]: ./storage-slurm.yaml
 
-[pfs-parallelstore.yaml]: ./pfs-parallelstore.yaml
-[Parallelstore]: ../modules/file-system/parallelstore/README.md
+### [gke-managed-lustre.yaml] ![core-badge]
+
+This Cluster Toolkit blueprint deploys a Google Kubernetes Engine (GKE) cluster integrated with Google Cloud Managed Lustre,
+providing a high-performance file system for demanding workloads.
+
+#### Features
+
+* **VPC Network:** Sets up a new VPC, subnet, and secondary ranges for GKE pods and services.
+* **Private Services Access:** Configures Private Services Access, required for Managed Lustre.
+* **Firewall Rules:** Creates firewall rules to allow traffic between GKE nodes and the Managed Lustre instance (port 988).
+* **Managed Lustre Instance:** Provisions a Google Cloud Managed Lustre file system instance.
+* **Service Accounts:** Creates dedicated service accounts for GKE node pools and workloads with necessary IAM roles.
+* **GKE Cluster:** Deploys a GKE cluster with the Managed Lustre CSI driver enabled (`enable_managed_lustre_csi: true`).
+* **Persistent Volume:** Creates a Kubernetes PersistentVolume (PV) and PersistentVolumeClaim (PVC) to make the Managed Lustre instance accessible to pods.
+* **GKE Node Pool:** Sets up a node pool where application pods can run and mount the Lustre file system.
+
+#### Requirements
+
+1. **Cluster Toolkit:** Ensure you have the Cluster Toolkit (`gcluster`) binary built and ready to use.
+2. **GCP Project:** A Google Cloud Project with necessary permissions to create VPCs, GKE clusters, Managed Lustre instances, and related resources.
+3. **Quotas:** Sufficient quotas for GCE, GKE, and Managed Lustre resources in the selected region. Note that Managed Lustre capacity and performance tiers have specific quota requirements. See [Managed Lustre Performance Tiers](https://cloud.google.com/managed-lustre/docs/create-instance#performance-tiers) and [Quotas](https://cloud.google.com/managed-lustre/docs/quotas).
+4. **GKE Version:** The blueprint is configured for GKE version `1.33.x` or later, as required by the Managed Lustre CSI driver.
+5. **Location:** Managed Lustre is only available in specific regions and zones. Verify and adjust based on [Managed Lustre Locations](https://cloud.google.com/managed-lustre/docs/locations).
+
+#### Steps to deploy the blueprint
+
+1. Install Cluster Toolkit
+    1. Install [dependencies](https://cloud.google.com/cluster-toolkit/docs/setup/install-dependencies).
+    1. Set up [Cluster Toolkit](https://cloud.google.com/cluster-toolkit/docs/setup/configure-environment).
+
+1. Switch to the Cluster Toolkit directory
+
+   ```sh
+   cd cluster-toolkit
+   ```
+
+1. Get the IP address for your host machine
+
+   ```sh
+   curl ifconfig.me
+   ```
+
+1. Update the vars block of the blueprint file
+    1. `project_id`: ID of the project where you are deploying the cluster.
+    1. `deployment_name`: Name of the deployment.
+    1. `region / zone`: Ensure these support Managed Lustre.
+    1. `authorized_cidr`: update the IP address in <your-ip-address>/32.
+    1. `size_gib`: Capacity of the Managed Lustre instance in GiB.
+    1. `per_unit_storage_throughput`: Throughput in MB/s per TiB. The combination of size and throughput must match a valid performance tier.
+
+1. Build the Cluster Toolkit binary
+
+   ```sh
+   make
+   ```
+
+1. Provision the GKE cluster
+
+   ```sh
+   ./gcluster deploy examples/gke-managed-lustre.yaml
+   ```
+
+   This process can take several minutes as it provisions the VPC, GKE cluster, Managed Lustre instance, and configures the CSI driver.
+
+#### Accessing and Using Managed Lustre
+
+1. Configure kubectl: After successful deployment, configure kubectl to connect to your new GKE cluster:
+
+   ```sh
+   gcloud container clusters get-credentials $(vars.deployment_name) \
+   --region $(vars.region) \
+   --project $(vars.project_id)
+   ```
+
+   Replace `$(vars.deployment_name)`, `$(vars.region)`, and `$(vars.project_id)` with the actual values from your blueprint.
+
+1. Verify PVC: Check that the PersistentVolumeClaim has been created and is Bound:
+
+   ```sh
+   kubectl get pvc
+   ```
+
+   You should see a PVC named [LUSTRE_INSTANCE_PVC] with STATUS: Bound
+
+   Note : [LUSTRE_INSTANCE_PVC] depicts lustre_instance_id suffixed with -pvc.
+
+1. Example Pod: Create a file named lustre-client-pod.yaml to deploy a test pod that mounts the Lustre volume
+
+   ```sh
+   apiVersion: v1
+   kind: Pod
+   metadata:
+     name: lustre-client-pod
+   spec:
+     containers:
+     - name: app
+       image: busybox
+       command: ["/bin/sh", "-c", "sleep 36000"] # Keep container running
+       volumeMounts:
+       - mountPath: "/mnt/lustre"
+         name: lustre-volume
+     volumes:
+     - name: lustre-volume
+       persistentVolumeClaim:
+         claimName: [LUSTRE_INSTANCE_PVC] # Matches the PVC name
+   ```
+
+   Note : [LUSTRE_INSTANCE_PVC] depicts lustre_instance_id suffixed with -pvc.
+
+   Note: This is just an example job using busybox image.
+
+1. Deploy the Pod:
+
+   ```sh
+   kubectl apply -f lustre-pod.yaml
+   ```
+
+1. Verify Mount: Once the pod is running, exec into it to check the mount:
+
+   ```sh
+   kubectl exec -it lustre-client-pod -- /bin/sh
+   # Inside the pod:
+   df -h /mnt/lustre
+   mount | grep lustre
+   ```
+
+#### Clean Up
+To destroy all resources created by this blueprint, run:
+
+   ```sh
+   ./gcluster destroy CLUSTER-NAME
+   ```
+
+   Replace `CLUSTER-NAME` with the `deployment_name` used in blueprint vars block.
+
+[gke-managed-lustre.yaml]: ../examples/gke-managed-lustre.yaml
 
 ### [cae-slurm.yaml] ![core-badge]
 
@@ -790,7 +896,7 @@ For this example the following is needed in the selected region:
 ### [hpc-build-slurm-image.yaml] ![community-badge] ![experimental-badge]
 
 This blueprint demonstrates how to use Cluster Toolkit to build a Slurm image on top
-of an existing image, `hpc-rocky-linux-8` in the case of this example.
+of an existing image, `hpc-rocky-linux-9` in the case of this example.
 
 The blueprint contains 3 groups:
 
@@ -806,9 +912,9 @@ The blueprint contains 3 groups:
 
 [hpc-build-slurm-image.yaml]: ../community/examples/hpc-build-slurm-image.yaml
 
-### [hpc-slurm-ubuntu2004.yaml] ![community-badge]
+### [hpc-slurm-ubuntu2204.yaml] ![community-badge]
 
-Similar to the [hpc-slurm.yaml] example, but using Ubuntu 20.04 instead of CentOS 7.
+Similar to the [hpc-slurm.yaml] example, but using Ubuntu 22.04 instead of CentOS 7.
 [Other operating systems] are supported by SchedMD for the the Slurm on GCP project and images are listed [here](https://github.com/GoogleCloudPlatform/slurm-gcp/blob/master/docs/images.md#published-image-family). Only the examples listed in this page been tested by the Cluster Toolkit team.
 
 The cluster will support 2 partitions named `debug` and `compute`.
@@ -819,9 +925,9 @@ partition runs on compute optimized nodes of type `cs-standard-60`. The
 `compute` partition may require additional quota before using.
 
 [Other operating systems]: https://github.com/GoogleCloudPlatform/slurm-gcp/blob/master/docs/images.md#supported-operating-systems
-[hpc-slurm-ubuntu2004.yaml]: ../community/examples/hpc-slurm-ubuntu2004.yaml
+[hpc-slurm-ubuntu2204.yaml]: ../community/examples/hpc-slurm-ubuntu2204.yaml
 
-#### Quota Requirements for hpc-slurm-ubuntu2004.yaml
+#### Quota Requirements for hpc-slurm-ubuntu2204.yaml
 
 For this example the following is needed in the selected region:
 
@@ -981,12 +1087,41 @@ that have local ssd drives deployed.
 
 [hpc-slurm-local-ssd.yaml]: ../community/examples/hpc-slurm-local-ssd.yaml
 
-### [hpc-slurm-h4d.yaml] ![community-badge] ![experimental-badge]
+### [hpc-slurm-h4d.yaml] ![core-badge]
 
 Creates a basic auto-scaling Slurm cluster with mostly default settings. The
 blueprint also creates two new VPC networks, one configured for RDMA networking and the other for non-RDMA networking, along with two filestore instances mounted to `/home` and `/apps`. There is an `h4d` partition that uses compute-optimized `h4d-highmem-192-lssd` machine type.
 
-[hpc-slurm-h4d.yaml]: ../community/examples/hpc-slurm-h4d.yaml
+[hpc-slurm-h4d.yaml]: ../examples/hpc-slurm-h4d/hpc-slurm-h4d.yaml
+
+### [hpc-slinky.yaml] ![community-badge] ![experimental-badge]
+
+The SchedMD Slinky Project deploys Slurm on Kubernetes. Slinky is particularly useful for:
+1. Those with a prefer a Slurm workload management paradigm, but a cloud-native operational experience
+2. Those who want the flexibility of running HPC jobs with either Kubernetes-based scheduling or Slurm-based scheduling, all on the same platform
+
+This blueprint creates a simple Slinky installation on top of Google Kubernetes Engine, with the following notable deviations from the Slinky quickstart setup:
+1. Two nodesets are implemented, following the pattern of an HPC nodeset and a debug nodeset.
+2. A login node is implemented.
+3. A lightweight, GCP-native metrics/monitoring system is adopted, rather than the Slinky-documented cluster-local Kube Prometheus Stack.
+4. Node affinities for system components, the login node, and compute nodesets are more explicitly defined, to improve stability, control, and HPC hardware utilization.
+
+While H3 compute-optimized VMs are used for the HPC nodeset, the machine type can easily be switched (including to GPU-accelerated instances).
+
+In order to create a static Slurm nodeset, which only requires one configuration to scale in/out (the nodeset's `replicas` setting), this example blueprint uses:
+* Autoscaling GKE node pools (via `initial_node_count`)
+* Non-autoscaling Slurm nodesets (via `replicas`), which sit 1:1 on top of the GKE nodes
+If both of these settings were static, two changes would be required for nodeset scale outs - one at the Slurm level (nodeset replicas) and one at the infrastructure level (node pool node count) - so instead the node pool autoscales to "follow" the nodeset specification.
+
+Scale in/out nodesets with a single `kubectl` command:
+
+```bash
+kubectl scale nodeset/slurm-compute-debug --replicas=5 -n slurm
+```
+
+Nodeset autoscaling is only possible with [KEDA installation and configuration work](https://github.com/SlinkyProject/slurm-operator/blob/main/docs/autoscaling.md), and this is not included in the example.
+
+[hpc-slinky.yaml]: ../community/examples/hpc-slinky/hpc-slinky.yaml
 
 ### [hcls-blueprint.yaml]: ![core-badge]
 
@@ -995,7 +1130,32 @@ GROMACS with GPUs and CPUs on Google Cloud. For full documentation, refer
 [document].
 
 [document]: ../docs/videos/healthcare-and-life-sciences/README.md
-[hcls-blueprint.yaml]:  ../example/hcls-blueprint.yaml
+[hcls-blueprint.yaml]:  ../examples/hcls-blueprint.yaml
+
+### [af3-slurm.yaml]: ![core-badge] ![experimental-badge]
+
+This blueprint lets you create a high-throughput execution environment for Google Deepmind's
+[AlphaFold 3](https://blog.google/technology/ai/google-deepmind-isomorphic-alphafold-3-ai-model)
+in your own GCP project. It uses the unmodified [AlphaFold 3 package](https://github.com/google-deepmind/alphafold3),
+and provides a best-practices mapping of it to Google Cloud, leveraging Google Cloud's HPC technology.
+
+We provide two simple examples that serve as basic templates for different ways of interacting with the
+AlphaFold 3 solution:
+
+* A Simple Job Launcher bash script that takes an AlphaFold 3 json file input (for the Datapipeline
+step or the Inference step) and submits it for processing to the AlphaFold 3 autoscaling Slurm cluster.
+* A Simple Service Launcher that has a central Python script that runs a loop monitoring directories on a
+provided GCS bucket for input files and which can be started as a system daemon on the
+controller-node, not requiring any user interaction with the AlphaFold 3 environment.
+
+Before using this solution, please review the [AlphaFold 3 Model Parameter Terms of Use](https://github.com/google-deepmind/alphafold3/blob/main/WEIGHTS_TERMS_OF_USE.md).
+Please check that you/your organization are eligible for obtaining the weights and that your use falls within the allowed terms and complies
+with the [Prohibited Use Policy](https://github.com/google-deepmind/alphafold3/blob/main/WEIGHTS_PROHIBITED_USE_POLICY.md).
+
+See the [AF3 Solution README] for more details.
+
+[AF3 Solution README]: ../examples/science/af3-slurm/README.md
+[af3-slurm.yaml]: ../examples/science/af3-slurm/af3-slurm.yaml
 
 ### [hpc-gke.yaml] ![core-badge]
 
@@ -1055,7 +1215,7 @@ to the cluster using `kubectl` and will run on the specified node pool.
     1. The output of the `./gcluster deploy` on CLI includes a `kubectl create` command to create the job.
 
        ```sh
-       kubectl create -f <job-yaml-path> 
+       kubectl create -f <job-yaml-path>
        ```
 
        This command creates a job that uses busybox image and prints `Hello World`. This result can be viewed by looking at the pod logs.
@@ -1109,7 +1269,7 @@ Toolkit. It includes:
 
   Users only need to provide machine type for standard ["a2", "a3" and "g2"] machine families,
   while the other settings like `type`, `count` , `gpu_driver_installation_config` will default to
-  machine family specific values. More on this [gke-node-pool](../community/modules/compute/gke-node-pool/README.md#gpus-examples)
+  machine family specific values. More on this [gke-node-pool](../modules/compute/gke-node-pool/README.md#gpus-examples)
 
 ```yaml
 machine_type: n1-standard-1
@@ -1149,27 +1309,38 @@ Once you have deployed the blueprint, follow output instructions to _fetch
 credentials for the created cluster_ and _submit a job calling `nvidia_smi`_.
 
 [ml-gke.yaml]: ../examples/ml-gke.yaml
-[`kubernetes-operations`]: ../community/modules/scripts/kubernetes-operations/README.md
+
+### [storage-vm.yaml] ![core-badge]
+
+Creates a standalone VM instance and securely attaches persistent disks that are provisioned directly into specified `hyperdisk-balanced` and `hyperdisk-throughput` Storage Pools. This allows the VM to share IOPS and throughput capacity from the pre-provisioned pools.
+
+[storage-vm.yaml]: ./storage-vm.yaml
 
 ### [storage-gke.yaml] ![core-badge]
 
-This blueprint shows how to use different storage options with GKE in the toolkit.
+This blueprint showcases the integration of several storage solutions:
 
-The blueprint contains the following:
+* **Google Cloud Storage (GCS):**
+  * The `data-bucket-zonal` module defines a GCS bucket configured with the `RAPID` storage class and `enable_hierarchical_namespace: true` for high-performance, zonal storage. More details on the [RAPID Bucket Cloud Docs](https://docs.cloud.google.com/storage/docs/rapid/rapid-bucket).
+  * **Anywhere Cache Support:** This blueprint also highlights support for [Anywhere Cache](https://cloud.google.com/storage/docs/anywhere-cache), a fully managed service that caches Cloud Storage data in Google Cloud. This improves read performance by co-locating cached data with compute resources.
+    * Note: A maximum of one cache per zone can be created for each bucket. For example, a bucket in `us-east1` can have caches in `us-east1-b` and `us-east1-c`.
+    * Refer to [Create a Cache](https://docs.cloud.google.com/storage/docs/anywhere-cache#create_a_cache) for more parameter details.
 
-* A K8s Job that uses a Filestore and a GCS bucket as shared file systems between pods.
-* A K8s Job that demonstrates different ephemeral storage options:
-  * memory backed emptyDir
-  * local SSD backed emptyDir
-  * SSD persistent disk backed ephemeral volume
-  * balanced persistent disk backed ephemeral volume
+* **Filestore:**
+  * A K8s Job utilizes a Filestore instance as another shared filesystem between pods.
+  * The `filestore` module sets up the Filestore instance, and `shared-filestore-pv` configures the Persistent Volume for GKE.
 
-Note that when type `local-ssd` is used, the specified node pool must have
-`local_ssd_count_ephemeral_storage` specified.
+* **Ephemeral Storage Options in GKE:**
+  * A dedicated K8s Job (`ephemeral-storage-job`) demonstrates different ephemeral storage types:
+    * **Memory-backed `emptyDir`**: Uses node memory for temporary storage.
+    * **Local SSD-backed `emptyDir`**: Leverages Local SSDs on the node for high-performance ephemeral storage.
+      * **Requirement**: The node pool (`local-ssd-pool`) *must* have `local_ssd_count_ephemeral_storage` specified.
+    * **SSD Persistent Disk (`pd-ssd`) ephemeral volume**: A Persistent Disk is dynamically created and managed for the job's lifecycle.
+    * **Balanced Persistent Disk (`pd-balanced`) ephemeral volume**: Similar to `pd-ssd`, a Persistent Disk is created and cleaned up with the job.
+  * When using `pd-ssd` or `pd-balanced`, a persistent disk is automatically created upon job submission and cleaned up when the job is deleted.
 
-When using either `pd-ssd` or `pd-balanced` ephemeral storage, a persistent disk
-will be created when the job is submitted. The disk will be automatically
-cleaned up when the job is deleted.
+* **Hyperdisk Storage Pools:**
+  * The `gke-persistent-volume` module dynamically provisions Persistent Volumes (PVs) that draw directly from `hyperdisk-balanced` and `hyperdisk-throughput` Storage Pools, allowing workloads to share aggregate disk performance.
 
 > [!Note]
 > The Kubernetes API server will only allow requests from authorized networks.
@@ -1179,6 +1350,25 @@ cleaned up when the job is deleted.
 > the IP address of the machine deploying the blueprint, for example
 > `--vars authorized_cidr=<your-ip-address>/32`.** You can use a service like
 > [whatismyip.com](https://whatismyip.com) to determine your IP address.
+
+#### Requirements
+
+1. **Cluster Toolkit:** Ensure you have installed all the dependencies required in cluster toolkit and followed the setup instructions.
+    1. Install [dependencies](https://docs.cloud.google.com/cluster-toolkit/docs/setup/install-dependencies).
+    2. Set up [Cluster Toolkit](https://docs.cloud.google.com/cluster-toolkit/docs/setup/configure-environment). For building the `gcluster` binary, see [Install Cluster Toolkit](https://docs.cloud.google.com/cluster-toolkit/docs/setup/configure-environment#install).
+
+#### Deployment Instructions
+
+1. Update the `vars` block of the blueprint file (`examples/storage-gke.yaml`) with your specific configurations.
+    1. `project_id`: ID of the project where you are deploying the cluster.
+    2. `deployment_name`: Name of the deployment.
+    3. `region` / `zone`: Ensure these map to your intended location.
+    4. `authorized_cidr`: Update to your IP address in `<your-ip-address>/32` format.
+2. Deploy the blueprint using the following command:
+
+   ```shell
+   ./gcluster deploy examples/storage-gke.yaml
+   ```
 
 [storage-gke.yaml]: ../examples/storage-gke.yaml
 
@@ -1250,74 +1440,6 @@ Replace `CLUSTER-NAME` with the `deployment_name` used in blueprint vars block.
 
 [gke-managed-hyperdisk.yaml]: ../examples/gke-managed-hyperdisk.yaml
 
-### [gke-managed-parallelstore.yaml] ![core-badge] ![experimental-badge]
-
-This blueprint shows how to use managed parallelstore storage options with GKE in the toolkit.
-
-The blueprint contains the following:
-
-* A K8s Job that uses a managed parallelstore storage volume option.
-* A K8s Job that demonstrates ML training workload with managed parallelstore storage disk operation.
-  * The sample training workload manifest will be generated under the gke-managed-parallelstore/primary folder, as tensorflow-GUID.yaml
-  * You can deploy this sample training workload using "kubectl apply -f tensorflow-GUID.yaml" to start the training
-
-> **Warning**: In this example blueprint, when storage type `Parallelstore` is specified in `gke-storage` module.
-> The lifecycle of the parallelstore is managed by the blueprint.
-> On glcuster destroy operation, the Parallelstore storage created will also be destroyed.
->
-> [!Note]
-> The Kubernetes API server will only allow requests from authorized networks.
-> The `gke-cluster` module needs access to the Kubernetes API server
-> to create a Persistent Volume and a Persistent Volume Claim. **You must use
-> the `authorized_cidr` variable to supply an authorized network which contains
-> the IP address of the machine deploying the blueprint, for example
-> `--vars authorized_cidr=<your-ip-address>/32`.** You can use a service like
-> [whatismyip.com](https://whatismyip.com) to determine your IP address.
-
-#### Steps to deploy the blueprint
-
-1. Install Cluster Toolkit
-    1. Install [dependencies](https://cloud.google.com/cluster-toolkit/docs/setup/install-dependencies).
-    1. Set up [Cluster Toolkit](https://cloud.google.com/cluster-toolkit/docs/setup/configure-environment).
-1. Switch to the Cluster Toolkit directory
-
-   ```sh
-   cd cluster-toolkit
-   ```
-
-1. Get the IP address for your host machine
-
-   ```sh
-   curl ifconfig.me
-   ```
-
-1. Update the vars block of the blueprint file
-    1. `project_id`: ID of the project where you are deploying the cluster.
-    1. `deployment_name`: Name of the deployment.
-    1. `authorized_cidr`: update the IP address in <your-ip-address>/32.
-1. Build the Cluster Toolkit binary
-
-   ```sh
-   make
-   ```
-
-1. Provision the GKE cluster
-
-   ```sh
-   ./gcluster deploy examples/gke-managed-parallelstore.yaml
-   ```
-
-#### Clean Up
-To destroy all resources associated with creating the GKE cluster, from Cloud Shell run the following command:
-
-```sh
-./gcluster destroy CLUSTER-NAME
-```
-
-Replace `CLUSTER-NAME` with the `deployment_name` used in blueprint vars block.
-
-[gke-managed-parallelstore.yaml]: ../examples/gke-managed-parallelstore.yaml
-
 ### [gke-a3-ultragpu.yaml] ![core-badge]
 
 Refer to [AI Hypercomputer Documentation](https://cloud.google.com/ai-hypercomputer/docs/create/gke-ai-hypercompute#create-cluster) for instructions.
@@ -1364,14 +1486,14 @@ If you see an error saying: `local-exec provisioner error` or `This environment 
 
 ### [gke-a3-highgpu.yaml] ![core-badge]
 
-This blueprint shows how to provision a GKE cluster with A3 High machines in the toolkit.
+This blueprint provisions a GKE cluster with A3 High nodes (`a3-highgpu-8g`). Refer to the [A3 High Deployment Guide](./gke-a3-highgpu/README.md) for detailed instructions.
 
-After provisioning the cluster and the nodepool, the below components will be installed
-to enable GPUDirect for the A3 High machines.
+A3 High VMs feature 8 NVIDIA H100 GPUs and are optimized for high-performance ML training. The blueprint automatically configures:
 
-* NCCL plugin for GPUDirect [TCPX](https://github.com/GoogleCloudPlatform/container-engine-accelerators/tree/master/gpudirect-tcpx)
-* [NRI](https://github.com/GoogleCloudPlatform/container-engine-accelerators/tree/master/nri_device_injector) device injector plugin
-* Provide support for injecting GPUDirect required components(annotations, volumes, rxdm sidecar etc.) into the user workload in the form of Kubernetes Job via a script.
+* **GPU-Direct TCPX**: High-bandwidth, low-latency networking stack.
+* **Multi-networking**: 4 dedicated VPC networks for GPU-to-GPU communication.
+* **Topology Aware Scheduling (TAS)**: Optimized workload placement via Kueue.
+* **Cluster Health Services (CHS)**: Automated GPU health checks.
 
 > [!Note]
 > The Kubernetes API server will only allow requests from authorized networks.
@@ -1379,31 +1501,47 @@ to enable GPUDirect for the A3 High machines.
 > to apply a manifest. **You must use
 > the `authorized_cidr` variable to supply an authorized network which contains
 > the IP address of the machine deploying the blueprint, for example
-> `--vars authorized_cidr=<your-ip-address>/32`.** You can use a service like
-> [whatismyip.com](https://whatismyip.com) to determine your IP address.
+> `--vars authorized_cidr=<your-ip-address>/32`.**
 
 #### Troubleshooting
 
 ##### Externally Managed Environment Error
 
-If you see an error saying: `local-exec provisioner error` or `This environment is externally managed`, please use a virtual environment. This error is caused due to a conflict between pip3 and the operating system's package manager (like apt on Debian/Ubuntu-based systems).
+If you see an error saying: `local-exec provisioner error` or `This environment is externally managed`, please use a virtual environment. This error is caused due to a conflict between pip3 and the operating system's package manager.
 
 ```shell
-  ## One time step of creating the venv
-  VENV_DIR=~/venvp3
-  python3 -m venv $VENV_DIR
-  ## Enter your venv.
-  source $VENV_DIR/bin/activate
+## One time step of creating the venv
+VENV_DIR=~/venvp3
+python3 -m venv $VENV_DIR
+## Enter your venv.
+source $VENV_DIR/bin/activate
 ```
 
-[gke-a3-highgpu.yaml]: ../examples/gke-a3-highgpu.yaml
+[gke-a3-highgpu.yaml]: ./gke-a3-highgpu/gke-a3-highgpu.yaml
+
+### [gke-a3-highgpu-inference-gateway.yaml] ![core-badge]
+
+This blueprint provisions a GKE cluster with A3 High machines, pre-configured to support the GKE Inference Gateway. It automates the setup of necessary networking components, such as a proxy-only subnet, and installs the required Custom Resource Definitions (CRDs) on the cluster.
+
+After successfully deploying this blueprint, you can proceed with deploying a sample workload with vLLM inferencing by following the official guide at [Serve a model with GKE Inference Gateway](https://cloud.google.com/kubernetes-engine/docs/tutorials/serve-with-gke-inference-gateway).
+
+This blueprint takes care of the initial infrastructure setup (e.g., network creation and CRD installation). You will need to follow the guide to install specific instances of `InferencePool`, `HTTPRoute`, and the `Model Server` deployment itself.
+
+[gke-a3-highgpu-inference-gateway.yaml]: ../examples/gke-a3-highgpu-inference-gateway.yaml
 
 ### [gke-consumption-options] ![core-badge]
 
-This folder holds multiple GKE blueprint examples that display different consumption options on GKE.
-* [DWS Calendar](../examples/gke-consumption-options/dws-calendar)
-* [DWS Flex Start](../examples/gke-consumption-options/dws-flex-start)
-* [DWS Flex Start with Queued Provisioning](../examples/gke-consumption-options/dws-flex-start-queued-provisioning)
+This folder holds multiple GKE blueprint examples that demonstrate different consumption options on GKE, covering hardware such as A3 Ultra (A3U), TPU v6e, and TPU 7x.
+
+* [**DWS Flex Start**](../examples/gke-consumption-options/dws-flex-start/README.md)
+  * [A3 Ultra](../examples/gke-consumption-options/dws-flex-start/gke-a3-ultragpu.yaml)
+  * [TPU 7x](../examples/gke-consumption-options/dws-flex-start/gke-tpu-7x)
+  * [TPU v6e](../examples/gke-consumption-options/dws-flex-start/gke-tpu-v6e)
+
+* [**DWS Flex Start with Queued Provisioning**](../examples/gke-consumption-options/dws-flex-start-queued-provisioning/README.md)
+  * [A3 Ultra](../examples/gke-consumption-options/dws-flex-start-queued-provisioning/gke-a3-ultragpu.yaml)
+  * [TPU 7x](../examples/gke-consumption-options/dws-flex-start-queued-provisioning/gke-tpu-7x)
+  * [TPU v6e](../examples/gke-consumption-options/dws-flex-start-queued-provisioning/gke-tpu-v6e)
 
 [gke-consumption-options]: ../examples/gke-consumption-options
 
@@ -1433,7 +1571,7 @@ For more information see:
 
 ### [fsi-montecarlo-on-batch.yaml](../community/examples/fsi-montecarlo-on-batch.yaml) ![community-badge] ![experimental-badge]
 
-## Monte Carlo Simulations for Value at Risk
+#### Monte Carlo Simulations for Value at Risk
 
 This blueprint will take you through a tutorial on an FSI Value at Risk calculation using Cloud tools:
 
@@ -1450,7 +1588,7 @@ See the [full tutorial here](../docs/tutorials/fsi-montecarlo-on-batch/README.md
 This blueprint provisions an HPC cluster running Slurm for use with a Simcenter StarCCM+
 tutorial.
 
-> The main tutorial is described on the [Cluster Toolkit website](https://cloud.google.com/cluster-toolkit/docs/simcenter-starccm-slurm/run-workload).
+> The main tutorial is described on the [Cluster Toolkit website](https://cloud.google.com/cluster-toolkit/docs/simcenter-star-ccm/run-workload).
 
 [tutorial-starccm-slurm.yaml]: ../community/examples/tutorial-starccm-slurm.yaml
 
@@ -1480,6 +1618,12 @@ is deployed as the native resource manager.
 See [README](../community/examples/flux-framework/README.md)
 
 [flux-cluster.yaml]: ../community/examples/flux-framework/flux-cluster.yaml
+
+### [hpc-slurm-kms.yaml] ![community-badge] ![experimental-badge]
+
+Creates a Slurm cluster with Customer-Managed Encryption Keys (CMEK) enabled for controller, login, and compute nodesets, as well as the Slurm configuration GCS bucket.
+
+[hpc-slurm-kms.yaml]: ../community/examples/hpc-slurm-kms.yaml
 
 ### [hpc-slurm-sharedvpc.yaml] ![community-badge] ![experimental-badge]
 
@@ -1518,11 +1662,23 @@ deployment_groups:
 [hpc-slurm-sharedvpc.yaml]: ../community/examples/hpc-slurm-sharedvpc.yaml
 [fs-shared-vpc]: https://cloud.google.com/filestore/docs/shared-vpc
 
-### [gke-tpu-v6] ![community-badge] ![experimental-badge]
+### [gke-tpu-v4] ![core-badge]
+This example shows how a TPU v4 cluster can be created and used to run a job that requires TPU capacity on GKE. Additional information on this TPU blueprint and associated workloads is in this [README](/examples/gke-tpu-v4/README.md).
+[gke-tpu-v4]: ../examples/gke-tpu-v4
 
-This example shows how TPU v6 cluster can be created and be used to run a job that requires TPU capacity on GKE. Additional information on TPU blueprint and associated changes are in this [README](/community/examples/gke-tpu-v6/README.md).
+### [gke-tpu-v5e] ![core-badge]
+This example shows how a TPU v5e cluster can be created and used to run a job that requires TPU capacity on GKE. Additional information on this TPU blueprint and associated workloads is in this [README](/examples/gke-tpu-v5e/README.md).
+[gke-tpu-v5e]: ../examples/gke-tpu-v5e
 
-[gke-tpu-v6]: ../community/examples/gke-tpu-v6
+### [gke-tpu-v5p] ![core-badge]
+This example shows how a TPU v5p cluster can be created and used to run a job that requires TPU capacity on GKE. Additional information on this TPU blueprint and associated workloads is in this [README](/examples/gke-tpu-v5p/README.md).
+[gke-tpu-v5p]: ../examples/gke-tpu-v5p
+
+### [gke-tpu-v6e] ![core-badge]
+
+This example shows how TPU v6e cluster can be created and be used to run a job that requires TPU capacity on GKE. Additional information on TPU blueprint and associated changes are in this [README](/examples/gke-tpu-v6e/README.md).
+
+[gke-tpu-v6e]: ../examples/gke-tpu-v6e
 
 ### [xpk-n2-filestore] ![community-badge] ![experimental-badge]
 
@@ -1569,6 +1725,137 @@ python3 xpk.py info --cluster xpk-01
 ```
 
 [xpk-n2-filestore]: ../community/examples/xpk-n2-filestore/xpk-n2-filestore.yaml
+
+### [gke-h4d] ![core-badge]
+
+This blueprint uses GKE to provision a Kubernetes cluster and a H4D node pool, along with networks and service accounts. Information about H4D machines can be found [here](https://cloud.google.com/blog/products/compute/new-h4d-vms-optimized-for-hpc). The deployment instructions can be found in the [README](/examples/gke-h4d/README.md).
+
+[gke-h4d]: ../examples/gke-h4d
+
+### [gke-g4] ![core-badge]
+
+This blueprint uses GKE to provision a Kubernetes cluster and a G4 node pool, along with networks and service accounts. Information about G4 machines can be found [here](https://cloud.google.com/blog/products/compute/introducing-g4-vm-with-nvidia-rtx-pro-6000). The deployment instructions can be found in the [README](/examples/gke-g4/README.md).
+
+[gke-g4]: ../examples/gke-g4
+
+### [gke-g4-confidential] ![core-badge]
+
+This blueprint provisions a GKE cluster running on Confidential VMs (G4 instances powered by AMD SEV-SNP) and NVIDIA Blackwell GPUs in hardware-enforced Confidential GPU mode (PCIe Secure Passthrough). It also configures secure boot-disk encryption for all node pools and supports dynamic Persistent Volumes encrypted with Customer-Managed Encryption Keys (CMEK) via GKE Confidential Storage. The deployment and verification instructions can be found in the [README](/examples/gke-g4-confidential/README.md).
+
+[gke-g4-confidential]: ../examples/gke-g4-confidential
+
+### [gke-a4] ![core-badge]
+
+This blueprint uses GKE to provision Kubernetes cluster and a A4 node pool, along with networks and service accounts. Information about a4 machines can be found [here](https://cloud.google.com/blog/products/compute/introducing-a4-vms-powered-by-nvidia-b200-gpu-aka-blackwell). The deployment instructions can be found in the [README](/examples/gke-a4/README.md).
+
+[gke-a4]: ../examples/gke-a4
+
+### [gke-a4x] ![core-badge]
+
+This blueprint uses GKE to provision Kubernetes cluster and a A4X node pool, along with networks and service accounts. Information about A4X machines can be found [here](https://cloud.google.com/blog/products/compute/new-a4x-vms-powered-by-nvidia-gb200-gpus). The deployment instructions can be found in the [README](/examples/gke-a4x/README.md).
+
+[gke-a4x]: ../examples/gke-a4x
+
+### [gke-a4x-max-bm] ![core-badge]
+
+This blueprint uses GKE to provision a Kubernetes cluster and a A4X Max node pool, along with networks and service accounts. Information about A4X Max machines can be found [here](https://cloud.google.com/blog/products/compute/now-shipping-a4x-max-vertex-ai-training-and-more). The deployment instructions can be found in the [README](/examples/gke-a4x-max-bm/README.md).
+
+[gke-a4x-max-bm]: ../examples/gke-a4x-max-bm
+
+### [netapp-volumes.yaml] ![core-badge]
+
+This blueprint demonstrates how to provision NFS volumes as shared filesystems for compute VMs, using Google Cloud NetApp Volumes. It can be used as an alternative to FileStore in blueprints.
+
+NetApp Volumes is a first-party Google service that provides NFS and/or SMB shared file-systems to VMs. It offers advanced data management capabilities and highly scalable capacity and performance.
+
+NetApp Volume provides:
+
+* robust support for NFSv3, NFSv4.x and SMB 2.1 and 3.x
+* a [rich feature set][service-levels]
+* scalable [performance](https://cloud.google.com/netapp/volumes/docs/performance/performance-benchmarks)
+* FlexCache: Caching of ONTAP-based volumes to provide high-throughput and low latency read access to compute clusters of on-premises data
+* [Auto-tiering](https://cloud.google.com/netapp/volumes/docs/configure-and-use/volumes/manage-auto-tiering) of unused data to optimse cost
+
+Support for NetApp Volumes is split into two modules.
+
+* **netapp-storage-pool** provisions a [storage pool](https://cloud.google.com/netapp/volumes/docs/configure-and-use/storage-pools/overview). Storage pools are pre-provisioned storage capacity containers which host volumes. A pool also defines fundamental properties of all the volumes within, like the region, the attached network, the [service level][service-levels], CMEK encryption, Active Directory and LDAP settings.
+* **netapp-volume** provisions a [volume](https://cloud.google.com/netapp/volumes/docs/configure-and-use/volumes/overview) inside an existing storage pool. A volume is a file-system which is shared using NFS or SMB. It provides advanced data management capabilities.
+
+You can provision multiple volumes in a pool. For service levels Standard, Premium and Extreme the throughput capability depends on volume size and service level. Every GiB of provisioned volume space adds 16/64/128 KiBps of throughput capability.
+
+#### Steps to deploy the blueprint
+
+To provision the bluebrint, please run:
+
+```shell
+./gcluster create examples/netapp-volumes.yaml --vars "project_id=${GOOGLE_CLOUD_PROJECT}" --vars region=us-central1 --vars zone=us-central1-a
+./gcluster deploy netapp-volumes
+```
+
+After the blueprint deployed, you can login to the VM created:
+
+```shell
+gcloud compute ssh --zone "us-central1-a" "netapp-volumes-0" --project ${GOOGLE_CLOUD_PROJECT} --tunnel-through-iap
+```
+
+A NetApp Volumes volume is provisioned and mounted to /home in all the provisioned VMs. A home directory for your user is created automatically:
+
+```shell
+pwd
+df -h -t nfs
+```
+
+#### Clean Up
+To destroy all resources associated with creating the GKE cluster, run the following command:
+
+```sh
+./gcluster destroy netapp-volumes
+```
+
+[netapp-storage-pool]: ../netapp-storage-pool/README.md
+[service-levels]: https://cloud.google.com/netapp/volumes/docs/discover/service-levels
+[auto-tiering]: https://cloud.google.com/netapp/volumes/docs/configure-and-use/volumes/manage-auto-tiering
+[netapp-volumes.yaml]: ../examples/netapp-volumes.yaml
+
+### [gke-tpu-7x] ![core-badge]
+
+This example shows how TPU 7x cluster can be created and be used to run a job that requires TPU capacity on GKE. Additional information on TPU blueprint and associated changes are in this [README](/examples/gke-tpu-7x/README.md).
+
+[gke-tpu-7x]: ../examples/gke-tpu-7x
+
+### [gcloud-example.yaml] ![community-badge] ![experimental-badge]
+
+This blueprint demonstrates how to use the `gcloud` community module to run
+arbitrary `gcloud` commands during deployment and destroy. It shows an example
+of creating and deleting a network, subnet, and VM instance.
+
+[gcloud-example.yaml]: ../community/examples/gcloud-example.yaml
+
+### [eda-all-on-cloud.yaml] ![community-badge]
+
+Creates a basic auto-scaling Slurm cluster intended for EDA use cases. The blueprint also creates two new VPC networks, a network called `eda-net` which connects VMs, Slurm and storage and a RDMA network called `eda-rdma-net` between the H4D nodes, along with four [Google Cloud NetApp Volumes](https://cloud.google.com/netapp/volumes/docs/configure-and-use/volumes/overview) mounted to `/home`, `/tools`, `/library` and `/scratch`. There is an `h4d` partition that uses compute-optimized `h4d-highmem-192-lssd` machine type.
+
+The deployment instructions can be found in the [README](../community/examples/eda/README.md).
+
+[eda-all-on-cloud.yaml]: ../community/examples/eda/eda-all-on-cloud.yaml
+
+### [eda-hybrid-cloud.yaml] ![community-badge]
+
+Creates a basic auto-scaling Slurm cluster intended for EDA use cases. The blueprint also connects to one existing user network which connects VMs, Slurm and storage and creates a RDMA network called `eda-rdma-net` for low latency communication between the compute nodes. There is an `h4d` partition that uses compute-optimized `h4d-highmem-192-lssd` machine type.
+
+Four pre-existing NFS volumes are mounted to `/home`, `/tools`, `/library` and `/scratch`. Using [FlexCache](https://cloud.google.com/netapp/volumes/docs/configure-and-use/volumes/cache-ontap-volumes/overview) volumes allows to bring on-premises data to Google Cloud compute, without having to manually copy the data. This enables "burst to the cloud" use cases.
+
+The deployment instructions can be found in the [README](../community/examples/eda/README.md).
+
+[eda-hybrid-cloud.yaml]: ../community/examples/eda/eda-hybrid-cloud.yaml
+
+### [hpc-slurm-google-cloud-dedicated.yaml] ![community-badge]
+
+Creates a Slurm cluster on C3 machine types for Google Cloud Dedicated (GCD) and sovereign cloud environments using Packer to pre-build a custom Slurm image based on Rocky Linux 8, configured with NFS home directories, SAuth authentication, and Hyperdisk Balanced storage.
+
+The deployment instructions can be found in the [README](../community/examples/hpc-slurm-google-cloud-dedicated/README.md).
+
+[hpc-slurm-google-cloud-dedicated.yaml]: ../community/examples/hpc-slurm-google-cloud-dedicated/hpc-slurm-google-cloud-dedicated.yaml
 
 ## Blueprint Schema
 
@@ -1685,9 +1972,9 @@ vars:
 
 Deployment variables are set under the vars field at the top level of the
 blueprint file. These variables can be explicitly referenced in modules as
-[Blueprint Variables](#blueprint-variables). Any module setting (inputs) not
-explicitly provided and matching exactly a deployment variable name will
-automatically be set to these values.
+[Blueprint Variables](#variables-expressions-and-functions). Any module
+setting (inputs) not explicitly provided and matching exactly a deployment
+variable name will automatically be set to these values.
 
 Deployment variables should be used with care. Module default settings with the
 same name as a deployment variable and not explicitly set will be overwritten by
@@ -1748,7 +2035,7 @@ default in the [modules](../modules/README.md) folder.
 To learn more about how to refer to a module in a blueprint file, please consult the
 [modules README file.](../modules/README.md)
 
-## Variables, expressions and functions
+## Variables, expressions, and functions
 
 Variables can be used to refer both to values defined elsewhere in the blueprint
 and to the output and structure of other modules.

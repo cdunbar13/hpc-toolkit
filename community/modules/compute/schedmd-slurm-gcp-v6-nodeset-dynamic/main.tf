@@ -1,4 +1,4 @@
-# Copyright 2023 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,11 +17,19 @@ locals {
   labels = merge(var.labels, { ghpc_module = "schedmd-slurm-gcp-v6-nodeset-dynamic", ghpc_role = "compute" })
 }
 
+module "instance_validation" {
+  source = "../../../../modules/internal/instance_validations"
+
+  machine_type = var.machine_type
+  disk_type    = var.disk_type
+}
+
 module "gpu" {
   source = "../../../../modules/internal/gpu-definition"
 
   machine_type      = var.machine_type
   guest_accelerator = var.guest_accelerator
+  machine_configs   = var.machine_configs
 }
 
 locals {
@@ -49,13 +57,14 @@ locals {
 
   additional_disks = [
     for ad in var.additional_disks : {
-      disk_name    = ad.disk_name
-      device_name  = ad.device_name
-      disk_type    = ad.disk_type
-      disk_size_gb = ad.disk_size_gb
-      disk_labels  = merge(ad.disk_labels, local.labels)
-      auto_delete  = ad.auto_delete
-      boot         = ad.boot
+      disk_name         = ad.disk_name
+      device_name       = ad.device_name
+      disk_type         = ad.disk_type
+      disk_storage_pool = ad.disk_storage_pool
+      disk_size_gb      = ad.disk_size_gb
+      disk_labels       = merge(ad.disk_labels, local.labels)
+      auto_delete       = ad.auto_delete
+      boot              = ad.boot
     }
   ]
 
@@ -85,11 +94,12 @@ module "slurm_nodeset_template" {
   slurm_bucket_path   = var.slurm_bucket_path
   metadata            = local.metadata
 
-  additional_disks = local.additional_disks
-  disk_auto_delete = var.disk_auto_delete
-  disk_labels      = merge(local.labels, var.disk_labels)
-  disk_size_gb     = var.disk_size_gb
-  disk_type        = var.disk_type
+  additional_disks  = local.additional_disks
+  disk_auto_delete  = var.disk_auto_delete
+  disk_labels       = merge(local.labels, var.disk_labels)
+  disk_size_gb      = var.disk_size_gb
+  disk_type         = var.disk_type
+  disk_storage_pool = var.disk_storage_pool
 
   bandwidth_tier = var.bandwidth_tier
   can_ip_forward = var.can_ip_forward

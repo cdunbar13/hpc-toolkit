@@ -1,5 +1,5 @@
 /**
- * Copyright 2023 Google LLC
+ * Copyright 2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -140,7 +140,7 @@ variable "backoff_limit" {
   default     = 0
 }
 
-variable "random_name_sufix" {
+variable "random_name_suffix" {
   description = "Appends a random suffix to the job name to avoid clashes."
   type        = bool
   default     = true
@@ -150,9 +150,10 @@ variable "persistent_volume_claims" {
   description = "A list of objects that describes a k8s PVC that is to be used and mounted on the job. Generally supplied by the gke-persistent-volume module."
   type = list(object({
     name          = string
+    namespace     = string
     mount_path    = string
     mount_options = string
-    is_gcs        = bool
+    storage_type  = string
   }))
   default = []
 }
@@ -184,4 +185,51 @@ variable "ephemeral_volumes" {
 variable "labels" {
   description = "Labels to add to the GKE job template. Key-value pairs."
   type        = map(string)
+}
+
+variable "tpu_accelerator_type" {
+  description = "The TPU accelerator type label. Populated from gke-node-pool via `use` field."
+  type        = list(string)
+  default     = [null]
+}
+
+variable "tpu_topology" {
+  description = "The TPU topology label. Populated from gke-node-pool via `use` field."
+  type        = list(string)
+  default     = [null]
+}
+
+variable "tpu_chips_per_node" {
+  description = "The number of TPU chips per node. Populated from gke-node-pool via `use` field."
+  type        = list(string)
+  default     = [null]
+}
+
+variable "resource_claims" {
+  description = "A list of resource claims at the Pod level, defining name and resource_claim_template_name."
+  type = list(object({
+    name                         = string
+    resource_claim_template_name = string
+  }))
+  default = []
+}
+
+variable "claims" {
+  description = "A list of claims in the container resources block (e.g. [{ name = \"dranet-network\" }])."
+  type = list(object({
+    name = string
+  }))
+  default = []
+}
+
+variable "enable_dranet" {
+  description = "Boolean indicating whether DRANET is enabled on the target node pool."
+  type        = list(bool)
+  default     = [false]
+}
+
+variable "dranet_template_name" {
+  description = "The name of the DRANET ResourceClaimTemplate to use. Automatically inherited from the node pool if 'use' is set."
+  type        = list(string)
+  default     = []
 }

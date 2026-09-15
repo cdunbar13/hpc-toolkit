@@ -1,4 +1,4 @@
-# Copyright 2022 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,6 +26,24 @@ repos:
     - --hook-config=--retry-once-with-cleanup=true
 - repo: local
   hooks:
+  - id: validate-kueue-tests
+    name: validate-kueue-tests
+    entry: python3 tools/cloud-build/daily-tests/validate_kueue_tests.py
+    language: python
+    language_version: python3
+    additional_dependencies: ['ruamel.yaml']
+    files: 'tools/cloud-build/daily-tests/builds/.*\.yaml'
+    pass_filenames: false
+    require_serial: true
+  - id: generate-kueue-locks
+    name: generate-kueue-locks
+    entry: python3 tools/cloud-build/provision/generate_kueue_locks.py
+    language: python
+    language_version: python3
+    additional_dependencies: ['ruamel.yaml']
+    files: 'tools/cloud-build/daily-tests/builds/.*\.yaml'
+    pass_filenames: false
+    require_serial: true
   - id: terraform-readme
     name: terraform-readme
     entry: tools/autodoc/terraform_docs.sh
@@ -74,17 +92,78 @@ repos:
     files: 'tools/cloud-build/daily-tests/builds/.*\.yaml'
     pass_filenames: false
     require_serial: true
+  - id: skills-lint
+    name: skills-lint
+    entry: python3 tools/run_eval.py --lint-only --all
+    language: python
+    language_version: python3
+    additional_dependencies: ['pyyaml>=6.0.1']
+    files: '^(skills/.*|tools/run_eval\.py|tools/tests/test_run_eval\.py)$'
+    pass_filenames: false
+    require_serial: true
   - id: pytest-check
     name: pytest-check
-    entry: python -m pytest
-    language: system
+    entry: pytest
+    language: python
+    additional_dependencies:
+    - pytest==8.0.0
+    - pytest-mock
+    - pytest-unordered
+    - mock  # Needed for 'import mock' statements
+    - google-cloud-secret-manager
+    - google-cloud-storage # Specifically required for util.py
+    - google-cloud-bigquery
+    - google-api-python-client
+    - PyYAML
+    - requests
+    - httplib2
+    - more-executors
+
+    - google-cloud-tpu
     types: [python]
     pass_filenames: false
+
   - id: mypy-check
     name: mypy-check
     entry: mypy community/modules/scheduler/schedmd-slurm-gcp-v6-controller/modules/slurm_files/scripts --check-untyped-defs
-    language: system
+    language: python
+    additional_dependencies:
+    - mypy==1.8.0
+    - types-PyYAML
+    - types-requests
+    - types-httplib2
+    - types-mock
+    - google-cloud-secret-manager
+    - google-cloud-storage
+    - google-cloud-bigquery
+    - google-api-python-client
+    - pytest
+    - pytest-unordered
+    - more-executors
+
+    - google-cloud-tpu
     types: [python]
+    pass_filenames: false
+
+  - id: go-vet-community-health-check
+    name: go-vet-community-health-check
+    entry: bash -c 'cd community/cluster-health-check && go vet ./...'
+    language: system
+    files: ^community/cluster-health-check/.*\.go$
+    pass_filenames: false
+
+  - id: go-unit-tests-community-health-check
+    name: go-unit-tests-community-health-check
+    entry: bash -c 'cd community/cluster-health-check && go test -timeout 30s -short -v ./...'
+    language: system
+    files: ^community/cluster-health-check/.*\.go$
+    pass_filenames: false
+
+  - id: go-mod-tidy-community-health-check
+    name: go-mod-tidy-community-health-check
+    entry: bash -c 'cd community/cluster-health-check && go mod tidy && git diff --exit-code go.mod go.sum'
+    language: system
+    files: ^community/cluster-health-check/(go\.mod|go\.sum|.*\.go)$
     pass_filenames: false
 
 - repo: https://github.com/dnephin/pre-commit-golang
@@ -92,6 +171,7 @@ repos:
   hooks:
   - id: go-fmt
   - id: go-vet
+    exclude: ^community/cluster-health-check/
   - id: go-imports
   - id: go-cyclo
     args: [-over=13]
@@ -102,10 +182,10 @@ repos:
 #   rev: v1.0.0-rc.1
 #   hooks:
 #   - id: go-critic
-- repo: https://github.com/Bahjat/pre-commit-golang
-  rev: v1.0.3
+- repo: https://github.com/golangci/golangci-lint
+  rev: v2.13.1
   hooks:
-  - id: go-static-check
+  - id: golangci-lint
 - repo: https://github.com/adrienverge/yamllint
   rev: v1.34.0
   hooks:
@@ -123,6 +203,7 @@ repos:
     # MD041 - First line in file should be a top level header
     # MD046 - Code block style
     # MD024 - Multiple headings cannot contain the same content.
+    exclude: (GEMINI\.md|skills\/.*)
     args: [--disable-rules, "MD013,MD022,MD033,MD034,MD041,MD046,MD024", scan]
 - repo: https://github.com/jumanjihouse/pre-commit-hooks
   rev: "3.0.0"

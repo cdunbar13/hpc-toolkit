@@ -1,5 +1,5 @@
 /**
- * Copyright 2022 Google LLC
+ * Copyright 2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -70,7 +70,7 @@ variable "django_su_email" {
 }
 
 variable "server_instance_type" {
-  default     = "e2-standard-2"
+  default     = "n2d-standard-2"
   type        = string
   description = "Instance size to use from HPC Frontend webserver"
 }

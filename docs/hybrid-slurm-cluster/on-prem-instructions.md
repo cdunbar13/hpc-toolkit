@@ -1,5 +1,10 @@
 # Setting up Hybrid Slurm Clusters Using the Cluster Toolkit
 
+> [!NOTE]
+> The `schedmd-slurm-gcp-v5` module has been officially deprecated since v1.45.0. This blueprint,
+> and relevant doces however, still refer to the `schedmd-slurm-gcp-v5` modules.
+> There is no current hybrid solution for slurm-gcp-v6 however one is being developed.
+
 ## Introduction
 
 Cloud hybrid slurm clusters are slurm clusters that manage both local and cloud
@@ -38,7 +43,7 @@ detail, as well as how to customize many of these assumptions to fit your needs.
 [Slurm on GCP][slurm-gcp] provides additional documentation for hybrid
 deployments in their [hybrid.md] documentation.
 
-[hybridmodule]: ../../community/modules/scheduler/schedmd-slurm-gcp-v5-hybrid/README.md
+[hybridmodule]: https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/v1.44.2/community/modules/scheduler/schedmd-slurm-gcp-v5-hybrid/README.md
 [slurm-gcp]: https://github.com/GoogleCloudPlatform/slurm-gcp/tree/5.12.2
 [slurm\_controller\_hybrid]: https://github.com/GoogleCloudPlatform/slurm-gcp/tree/master/terraform/slurm_cluster/modules/slurm_controller_hybrid
 [hybrid.md]: https://github.com/GoogleCloudPlatform/slurm-gcp/blob/5.12.2/docs/hybrid.md
@@ -54,8 +59,11 @@ associated slurm controller:
   * Required: **Yes**
   * Contains slurm configuration files such as `slurm.conf`.
 * `/etc/munge`
-  * Required: **Yes**
+  * Required: **Yes** (if using legacy MUNGE authentication)
   * Contains the munge key file, `munge.key`.
+* `/etc/slurm`
+  * Required: **Yes** (if using Slurm Native Authentication)
+  * Contains the native authentication token file, `slurm.key`. Must be distributed manually with strict `0400` permissions to custom hybrid/on-prem submission hosts.
 * `/home`
   * Required: No, but recommended
   * Though not required, having the home directory shared between the controller
@@ -161,8 +169,8 @@ make install
 A valid Cluster Toolkit blueprint for creating a hybrid configuration deployment can
 be found in the blueprints directory with the name [hybrid-configuration.yaml].
 This blueprint can be customized to your needs, for example, partitions can be
-updated or new partitions can be defined. See the documentation for the
-[schedmd-slurm-gcp-v5-partition](../../community/modules/compute/schedmd-slurm-gcp-v5-partition/README.md)
+updated or new partitions can be defined. See the documentation for the _now deprecated_
+[schedmd-slurm-gcp-v5-partition](https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/v1.44.2/community/modules/compute/schedmd-slurm-gcp-v5-partition/README.md)
 module for more information.
 
 Additionally, many of the parameters for the [schedmd-slurm-gcp-v5-hybrid][hybridmodule]
@@ -181,11 +189,11 @@ settings to be called out:
   directory as the `slurm.conf` file.
 
 [hybrid-configuration.yaml]: ./blueprints/hybrid-configuration.yaml
-[network_storage]: ../../community/modules/scheduler/schedmd-slurm-gcp-v5-hybrid/README.md#input_network_storage
-[google_app_cred_path]: ../../community/modules/scheduler/schedmd-slurm-gcp-v5-hybrid/README.md#input_google_app_cred_path
-[slurm_bin_dir]: ../../community/modules/scheduler/schedmd-slurm-gcp-v5-hybrid/README.md#input_slurm_bin_dir
-[output_dir]: ../../community/modules/scheduler/schedmd-slurm-gcp-v5-hybrid/README.md#input_output_dir
-[install_dir]: ../../community/modules/scheduler/schedmd-slurm-gcp-v5-hybrid/README.md#input_install_dir
+[network_storage]: https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/v1.44.2/community/modules/scheduler/schedmd-slurm-gcp-v5-hybrid/README.md#input_network_storage
+[google_app_cred_path]: https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/v1.44.2/community/modules/scheduler/schedmd-slurm-gcp-v5-hybrid/README.md#input_google_app_cred_path
+[slurm_bin_dir]: https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/v1.44.2/community/modules/scheduler/schedmd-slurm-gcp-v5-hybrid/README.md#input_slurm_bin_dir
+[output_dir]: https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/v1.44.2/community/modules/scheduler/schedmd-slurm-gcp-v5-hybrid/README.md#input_output_dir
+[install_dir]: https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/v1.44.2/community/modules/scheduler/schedmd-slurm-gcp-v5-hybrid/README.md#input_install_dir
 
 ### Creating a Slurm Compute Image
 
@@ -307,7 +315,76 @@ the credentials as the [`google_app_cred_path`][inputappcred] setting in the
 [wif]: https://cloud.google.com/iam/docs/workload-identity-federation
 [wifconfig]: https://cloud.google.com/iam/docs/configuring-workload-identity-federation
 [sakey]: https://cloud.google.com/docs/authentication/provide-credentials-adc#local-key
-[inputappcred]: ../../community/modules/scheduler/schedmd-slurm-gcp-v5-hybrid/README.md#input_google_app_cred_path
+[inputappcred]: https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/v1.44.2/community/modules/scheduler/schedmd-slurm-gcp-v5-hybrid/README.md#input_google_app_cred_path
+
+### Distributing Slurm Native Authentication Token manually
+
+Unlike compute and login nodes residing within your Google Cloud VPC (which securely mount the temporary NFS distribution share on startup and copy the token automatically), external submission hosts and on-premise submit nodes in a hybrid setup cannot resolve internal GCP VPC NFS shares.
+
+For hybrid clusters utilizing Slurm Native Authentication, administrators **must manually extract, securely transfer, and configure the secret `slurm.key` token** on all on-premise submit and compute nodes.
+
+Follow these step-by-step instructions to manually distribute and register the token safely:
+
+#### Step 1: Extract the Token from the GCP Controller Node
+
+Log into your deployed GCP Slurm Controller Node, switch to root, and extract the generated token:
+
+```bash
+# SSH to your cloud controller
+gcloud compute ssh <cloud_controller_name> --zone=<cloud_zone>
+
+# View and copy the key (or extract directly)
+sudo cat /etc/slurm/slurm.key
+```
+
+> [!IMPORTANT]
+> The token string is a highly sensitive cryptographic secret that establishes total daemon auth control. Treat it with the equivalent security boundaries as private SSH keys or root password files.
+
+#### Step 2: Securely Transfer the Token to On-Premise Nodes
+
+Use `scp` or a secure, encrypted transport layer to copy the token from the GCP controller directly to your target on-premise nodes:
+
+```bash
+# Simulates transfer from controller to an on-prem node
+scp /etc/slurm/slurm.key admin@<on_prem_node_ip>:/tmp/slurm.key
+```
+
+#### Step 3: Configure Token Permissions and Ownership on the On-Premise Node
+
+Log into the target on-premise node. Place the token under the `/etc/slurm/` configurations folder and enforce strict security permissions matching SchedMD requirements:
+
+```bash
+# Log into target on-premise node, and elevate to root
+sudo su -
+
+# Ensure the etc configurations directory exists
+mkdir -p /etc/slurm/
+
+# Move token to secure location
+mv /tmp/slurm.key /etc/slurm/slurm.key
+
+# Set user & group ownership to the local 'slurm' account
+# (Verify that the UID/GID matches your local configuration standards!)
+chown slurm:slurm /etc/slurm/slurm.key
+
+# Restrict permissions strictly to read-only for the slurm user
+chmod 0400 /etc/slurm/slurm.key
+```
+
+#### Step 4: Validate Token Authentication Integrity
+
+Verify that the local on-premise node's Slurm command tools can successfully handshake with the GCP cloud controller through the secure network tunnel:
+
+```bash
+# Run status checks using the target config context
+scontrol ping
+```
+
+> [!TIP]
+> If you experience authentication connection hangs or job rejects:
+>
+> 1. Run `ls -l /etc/slurm/slurm.key` on the on-premise node and verify that it matches: `-r-------- 1 slurm slurm 128 ...`
+> 2. Open `/var/log/slurmctld.log` on the GCP Controller node, and check for: `error: auth/slurm: key validation failed...` (which signifies a token string mismatch between the on-prem node and the controller!).
 
 ### Prepare NFS
 
@@ -382,7 +459,7 @@ provided below:
       mount_options: ""
 ```
 
-[inputns]: ../../community/modules/scheduler/schedmd-slurm-gcp-v5-hybrid/README.md#input\_network\_storage
+[inputns]: https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/v1.44.2/community/modules/scheduler/schedmd-slurm-gcp-v5-hybrid/README.md#input\_network\_storage
 
 #### Mount From Another Source
 

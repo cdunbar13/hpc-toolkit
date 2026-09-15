@@ -1,4 +1,4 @@
-# Copyright 2025 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ vars:
   rdma_net_range: 192.168.32.0/24
   hostname_prefix: $(vars.deployment_name)-odyssey
   base_network_name: $(vars.deployment_name)
+  reservation_name: "" # Optional: Set only if a reservation is available.
 
 # Documentation for each of the modules used below can be found at
 # https://github.com/GoogleCloudPlatform/hpc-toolkit/blob/main/modules/README.md
@@ -49,18 +50,13 @@ deployment_groups:
       network_routing_mode: REGIONAL
       enable_cloud_router: false
       enable_cloud_nat: false
+      enable_internal_traffic: false
       subnetworks:
       - subnet_name: $(vars.base_network_name)-rdma-sub-0
         subnet_region: $(vars.region)
         subnet_ip: $(vars.rdma_net_range)
         region: $(vars.region)
-      firewall_rules:
-      - name: $(vars.base_network_name)-rdma-0
-        ranges: [$(vars.rdma_net_range)]
-        allow:
-        - protocol: tcp
-        - protocol: udp
-        - protocol: icmp
+      nic_type: "IRDMA"
 
   - id: homefs
     source: modules/file-system/filestore
@@ -75,7 +71,6 @@ deployment_groups:
     settings:
       configure_ssh_host_patterns:
       - $(vars.hostname_prefix)-*
-      install_cloud_rdma_drivers: true
       set_ofi_cloud_rdma_tunables: true
       local_ssd_filesystem:
         fs_type: ext4
@@ -91,32 +86,14 @@ deployment_groups:
       instance_count: 2
       disk_type: hyperdisk-balanced
       on_host_maintenance: TERMINATE
+      reservation_name: $(vars.reservation_name)
       network_interfaces:
         $(concat(
-          [{
-            network=null,
-            subnetwork=cluster-net-0.subnetwork_self_link,
-            subnetwork_project=vars.project_id,
-            nic_type="GVNIC",
-            queue_count=null,
-            network_ip=null,
-            stack_type=null,
-            access_config=[{nat_ip=null, public_ptr_domain_name=null, network_tier=null}],
-            ipv6_access_config=[],
-            alias_ip_range=[]
-          },
-          {
-            network=null,
-            subnetwork=cluster-rdma-net-0.subnetwork_self_link,
-            subnetwork_project=vars.project_id,
-            nic_type="IRDMA",
-            queue_count=null,
-            network_ip=null,
-            stack_type=null,
-            access_config=[],
-            ipv6_access_config=[],
-            alias_ip_range=[]
-          }]
+          [
+          merge(cluster-net-0.instance_additional_networks[0],
+          {access_config = [{ nat_ip = null, public_ptr_domain_name = null, network_tier = null }] })
+          ],
+          cluster-rdma-net-0.instance_additional_networks
         ))
 
   - id: wait-for-vms

@@ -1,5 +1,5 @@
 /**
- * Copyright 2022 Google LLC
+ * Copyright 2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ variable "job_id" {
 }
 
 variable "job_filename" {
-  description = "The filename of the generated job template file. Will default to `cloud-batch-<job_id>.json` if not specified"
+  description = "The filename of the generated job template file. Will default to `<job_id>.yaml` if not specified"
   type        = string
   default     = null
 }
@@ -198,7 +198,7 @@ variable "instance_image" {
   type        = map(string)
   default = {
     project = "cloud-hpc-image-public"
-    family  = "hpc-rocky-linux-8"
+    family  = "hpc-rocky-linux-9"
   }
 
   validation {

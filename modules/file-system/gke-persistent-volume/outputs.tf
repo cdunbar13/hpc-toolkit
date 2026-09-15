@@ -1,5 +1,5 @@
 /**
-  * Copyright 2023 Google LLC
+  * Copyright 2026 Google LLC
   *
   * Licensed under the Apache License, Version 2.0 (the "License");
   * you may not use this file except in compliance with the License.
@@ -15,12 +15,17 @@
   */
 
 output "persistent_volume_claims" {
-  description = "An object that describes a k8s PVC created by this module."
+  description = "An object describing the Kubernetes PersistentVolumeClaim created by this module."
   value = {
     name          = local.pvc_name
+    namespace     = var.namespace
     mount_path    = var.network_storage.local_mount
     mount_options = var.network_storage.mount_options
-    is_gcs        = local.is_gcs
+    storage_type  = local.storage_type
   }
-  depends_on = [kubectl_manifest.pvc]
+}
+
+output "pvc_name" {
+  description = "The name of the Kubernetes PVC created by this module."
+  value       = local.pvc_name
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ output "install_managed_lustre_client" {
 
 output "lustre_id" {
   description = "An identifier for the resource with format `projects/{{project}}/locations/{{location}}/instances/{{name}}`"
-  value       = google_lustre_instance.lustre_instance.instance_id
+  value       = google_lustre_instance.lustre_instance.id
 }
 
 output "capacity_gib" {

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2023 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,22 +38,47 @@ import itertools
 # OFE-deployment test is configured to only run as a PR trigger and does
 # not run on a nightly basis. Refer tools/cloud-build/provision/pr-ofe-test.tf
 # for the configuration.
-TO_SKIP = frozenset(["ofe-deployment"])
+TO_SKIP = frozenset([
+    "ofe-deployment",
+    "ml-a3-ultragpu-slurm",
+    "gke-a3-ultragpu",
+    "ml-a3-ultragpu-jbvms"
+])
 
 # Seed for deterministic order of tests, change to other value to shuffle tests
 ORDER_SEED = b"What a wonderful phrase"
 
 
  # Test that shouldn't be scheduled too close to each other
-TEMPORAL_CONSTAINTS = [
+TEMPORAL_CONSTRAINTS = [
     # (set_of_tests, min_distance)
-    (("ml-a4-highgpu-slurm", "gke-a4"), 2*60),
-    (("ml-a3-ultragpu-slurm", "ml-a3-ultragpu-jbvms", "gke-a3-ultragpu"), 1*60),
-    (("ml-a3-megagpu-slurm", "ml-a3-megagpu-slurm-ubuntu", "gke-a3-megagpu"), 1*60),
+    ((
+        "ml-a4-highgpu-onspot-slurm",
+        "gke-a4-onspot"
+    ), 2*60),
+    ((
+        "ml-a3-ultragpu-onspot-slurm",
+        "ml-a3-ultragpu-onspot-jbvms",
+        "gke-a3-ultragpu-onspot"
+    ), 2*60),
+    ((
+        "ml-a3-megagpu-slurm-ubuntu",
+        "gke-a3-megagpu",
+        "ml-a3-megagpu-onspot-slurm-ubuntu",
+        "gke-a3-megagpu-onspot"
+    ), 1*60),
+    ((
+        "ml-a3-highgpu-slurm",
+        "gke-a3-highgpu"
+    ), 1*60),
+    ((
+        "ml-a3-highgpu-onspot-slurm",
+        "gke-a3-highgpu-onspot"
+    ), 1*60),
 ]
 # TODO:
 # * Consider defining constraints (e.g. reservations used) as a tags within tests yamls
-# * Use better solution than randome brute force
+# * Use better solution than random brute force
 
 def list_builds() -> list[str]:
     builds = [b[:-5] for b in glob.glob("*.yaml", root_dir="../daily-tests/builds/")]
@@ -73,16 +98,17 @@ def schedule_evenly(builds: list[str], start: int, end: int) -> dict[str, int]:
 
 
 def check_resource_constraints(schedule: dict[str, int]) -> bool:
-    for tests, min_distance in TEMPORAL_CONSTAINTS:
-        for a, b  in itertools.combinations(tests, 2):
+    for tests, min_distance in TEMPORAL_CONSTRAINTS:
+        active_tests = [t for t in tests if t in schedule]
+        for a, b in itertools.combinations(active_tests, 2):
             if abs(schedule[a] - schedule[b]) < min_distance:
                 return False
     return True
 
 
 def crontab(schedule: dict[str, int]) -> dict[str, str]:
-    return { # test: "{minutes} {hours} * * MON-FRI"
-        k: f"{t % 60} {t // 60} * * MON-FRI" for k, t in schedule.items()}
+    return { # test: "{minutes} {hours} * * MON,TUE,THU,FRI"
+        k: f"{t % 60} {t // 60} * * MON,TUE,THU,FRI" for k, t in schedule.items()}
 
 MAX_TRIES = 102000
 if __name__ == "__main__":
@@ -96,7 +122,7 @@ if __name__ == "__main__":
 
     assert args.start_time < args.end_time
     builds = list_builds()
-    
+
     for _ in range(MAX_TRIES):
         schedule = schedule_evenly(builds, args.start_time, args.end_time)
         if check_resource_constraints(schedule):
@@ -106,5 +132,3 @@ if __name__ == "__main__":
 
     print(f"Failed to find valid schedule after {MAX_TRIES} tries", file=sys.stderr)
     sys.exit(1)
-
-    

@@ -1,5 +1,5 @@
 /**
-  * Copyright 2023 Google LLC
+  * Copyright 2026 Google LLC
   *
   * Licensed under the Apache License, Version 2.0 (the "License");
   * you may not use this file except in compliance with the License.
@@ -109,4 +109,59 @@ locals {
 output "instructions" {
   description = "Instructions for submitting the sample GPUDirect enabled job."
   value       = local.gpu_direct_enabled ? local.gpu_direct_instruction : null
+}
+
+output "node_count_static" {
+  description = "The number of static nodes in node-pool."
+  value       = coalesce(var.static_node_count, var.initial_node_count, 0)
+}
+
+output "guest_accelerator" {
+  description = "The accelerator type of the nodes."
+  value       = local.guest_accelerator
+}
+
+output "cluster_id" {
+  description = "An identifier for the gke cluster with format projects/{{project_id}}/locations/{{region}}/clusters/{{name}}."
+  value       = var.cluster_id
+}
+
+output "machine_type" {
+  description = "Machine Type"
+  value       = var.machine_type
+}
+
+output "instance_templates" {
+  description = "The URLs of Instance Templates"
+  value       = [for key, template in data.google_compute_region_instance_template.instance_template : template.self_link]
+}
+
+output "tpu_accelerator_type" {
+  description = "The label value for the TPU accelerator type (e.g., 'tpu-v6e-slice')."
+  value       = module.tpu.is_tpu ? module.tpu.tpu_accelerator_type : null
+}
+
+output "tpu_topology" {
+  description = "The topology of the TPU slice (e.g., '4x4')."
+  value       = module.tpu.is_tpu ? module.tpu.tpu_topology : null
+}
+
+output "tpu_chips_per_node" {
+  description = "The number of TPU chips on each node in the pool."
+  value       = module.tpu.is_tpu ? module.tpu.tpu_chips_per_node : null
+}
+
+output "accelerator_topology_mode" {
+  description = "The accelerator topology mode for the resource policy."
+  value       = var.accelerator_topology_mode
+}
+
+output "enable_dranet" {
+  description = "Boolean indicating whether managed DRANET is enabled on this node pool."
+  value       = local.enable_dranet_actual
+}
+
+output "dranet_template_name" {
+  description = "The name of the DRANET ResourceClaimTemplate deployed for this node pool."
+  value       = local.enable_dranet_actual ? local.dranet_template_name_actual : null
 }

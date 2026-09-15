@@ -1,4 +1,4 @@
-# Copyright 2023 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,27 +13,32 @@
 # limitations under the License.
 
 terraform {
-  required_version = ">= 1.3"
+  required_version = ">= 1.12.2"
 
   required_providers {
     google = {
       source  = "hashicorp/google"
-      version = ">= 6.16"
+      version = ">= 7.44.0"
     }
     google-beta = {
       source  = "hashicorp/google-beta"
-      version = ">= 6.16"
+      version = ">= 7.44.0"
     }
     kubernetes = {
       source  = "hashicorp/kubernetes"
       version = ">= 2.36"
     }
+    time = {
+      source  = "hashicorp/time"
+      version = "~> 0.13"
+    }
+
   }
   provider_meta "google" {
-    module_name = "blueprints/terraform/hpc-toolkit:gke-cluster/v1.52.0"
+    module_name = "blueprints/terraform/hpc-toolkit:gke-cluster/v1.103.0"
   }
 
   provider_meta "google-beta" {
-    module_name = "blueprints/terraform/hpc-toolkit:gke-cluster/v1.45.0"
+    module_name = "blueprints/terraform/hpc-toolkit:gke-cluster/v1.103.0"
   }
 }

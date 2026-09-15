@@ -1,5 +1,5 @@
 /**
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,8 @@ locals {
   input_reservation_projects = [for r in try(var.reservation_affinity.specific_reservations, []) : coalesce(r.project, var.project_id)]
   # We, also, remember the suffix "/reservationBlocks/exr-one-block-1" for use elsewhere afterwards
   input_reservation_suffixes = [for r in try(var.reservation_affinity.specific_reservations, []) : substr(r.name, length(split("/", r.name)[0]), -1)]
+  # Adding this variable to bypass the machine-type validation for TPUs
+  is_tpu = var.placement_policy.tpu_topology != null
 }
 
 data "google_compute_reservation" "specific_reservations" {
@@ -30,7 +32,7 @@ data "google_compute_reservation" "specific_reservations" {
     {} :
     {
       for pair in flatten([
-        for zone in try(var.zones, []) : [
+        for zone in(var.zones != null ? var.zones : []) : [
           for i, reservation_name in try(local.input_reservation_names, []) : {
             key : "${local.input_reservation_projects[i]}/${zone}/${reservation_name}"
             zone : zone
@@ -56,14 +58,20 @@ locals {
   verified_specific_reservations = [for k, v in data.google_compute_reservation.specific_reservations : v if(v.specific_reservation != null && v.specific_reservation_required == true)]
 
   # Build two maps to be used to compare the VM properties between reservations and the node pool
-  # Skip this for TPUs
-  reservation_vm_properties = local.has_gpu ? ([for reservation in local.verified_specific_reservations : {
+  # Validation of only machine-type for CPUs and and both machine-type and guest-accelerators for GPUs
+  # Skip this for TPUs ( returns an empty list to skip the machine-type validation for aggregate TPU reservations)
+  reservation_vm_properties = local.is_tpu ? [] : [for reservation in local.verified_specific_reservations : {
     "machine_type" : try(reservation.specific_reservation[0].instance_properties[0].machine_type, "")
-    "guest_accelerators" : { for acc in try(reservation.specific_reservation[0].instance_properties[0].guest_accelerators, []) : acc.accelerator_type => acc.accelerator_count }
-  }]) : []
+    "guest_accelerators" : local.has_gpu ? ( # Conditional check for GPUs
+      { for acc in try(reservation.specific_reservation[0].instance_properties[0].guest_accelerators, []) : acc.accelerator_type => acc.accelerator_count }
+    ) : {} # If no GPUs, it's an empty map {}
+  }]
+
   nodepool_vm_properties = {
     "machine_type" : var.machine_type
-    "guest_accelerators" : { for acc in try(local.guest_accelerator, []) : coalesce(acc.type, try(local.generated_guest_accelerator[0].type, "")) => coalesce(acc.count, try(local.generated_guest_accelerator[0].count, 0)) }
+    "guest_accelerators" : local.has_gpu ? ( # Conditional check for GPUs
+      { for acc in try(local.guest_accelerator, []) : (acc.type != null ? acc.type : (length(local.generated_guest_accelerator) > 0 ? local.generated_guest_accelerator[0].type : "unknown")) => coalesce(acc.count, try(local.generated_guest_accelerator[0].count, 0)) }
+    ) : {} # If no GPUs, it's an empty map {}
   }
 
   # Compare two maps by counting the keys that mismatch.
@@ -82,18 +90,16 @@ locals {
 }
 
 locals {
-  # Check if reservation is valid, that is, if it exists, there should be only 1 verified specific reservation or the reservation doesn't exist
-  is_valid_reservation = length(local.verified_specific_reservations) == 1 || !var.is_reservation_active
+  # Check if reservation is valid: specific reservations must be verified in all targeted zones
+  is_valid_reservation = (length(local.verified_specific_reservations) > 0 && length(local.verified_specific_reservations) == length(toset(var.zones != null ? var.zones : []))) || !var.is_reservation_active
 
   # Build the list of reservation names when var.is_reservation_active is true
-  active_reservation_values = [
-    for i, r in local.verified_specific_reservations :
-    length(local.input_reservation_suffixes[i]) > 0 ?
-    format("%s%s", r.name, local.input_reservation_suffixes[i]) :
-    "projects/${r.project}/reservations/${r.name}"
-  ]
+  active_reservation_values = distinct([
+    for r in local.verified_specific_reservations :
+    "projects/${r.project}/reservations/${r.name}${try(local.input_reservation_suffixes[0], "")}"
+  ])
 
-  # Define a default reservation value if no specific reservations are present
-  specific_reservation_name  = length(local.input_reservation_names) > 0 ? local.input_reservation_names[0] : ""
-  default_reservation_values = ["projects/${var.project_id}/reservations/${local.specific_reservation_name}"]
+  default_reservation_values = local.input_specific_reservations_count == 0 ? [] : [
+    "projects/${local.input_reservation_projects[0]}/reservations/${local.input_reservation_names[0]}${try(local.input_reservation_suffixes[0], "")}"
+  ]
 }

@@ -1,4 +1,4 @@
-# Copyright 2025 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -290,8 +290,6 @@ deployment_groups:
           NCCL_CROSS_NIC=0
           NCCL_NET_GDR_LEVEL=PIX
           NCCL_P2P_NET_CHUNKSIZE=131072
-          NCCL_P2P_PCI_CHUNKSIZE=131072
-          NCCL_P2P_NVL_CHUNKSIZE=524288
           NCCL_NVLS_CHUNKSIZE=524288
           NCCL_IB_GID_INDEX=3
           NCCL_IB_ADAPTIVE_ROUTING=1
@@ -332,31 +330,13 @@ deployment_groups:
       provisioning_model: $(vars.a4h_provisioning_model)
       network_interfaces:
         $(concat(
-          [{
-            network=null,
-            subnetwork=a4high-net-0.subnetwork_self_link,
-            subnetwork_project=vars.project_id,
-            nic_type="GVNIC",
-            queue_count=null,
-            network_ip=null,
-            stack_type=null,
-            access_config=[{nat_ip=null, public_ptr_domain_name=null, network_tier=null}],
-            ipv6_access_config=[],
-            alias_ip_range=[]
-          },
-          {
-            network=null,
-            subnetwork=a4high-net-1.subnetwork_self_link,
-            subnetwork_project=vars.project_id,
-            nic_type="GVNIC",
-            queue_count=null,
-            network_ip=null,
-            stack_type=null,
-            access_config=[{nat_ip=null, public_ptr_domain_name=null, network_tier=null}],
-            ipv6_access_config=[],
-            alias_ip_range=[]
-          }],
-          a4high-rdma-net.subnetwork_interfaces,
+         [
+         merge(a4high-net-0.instance_additional_networks[0],
+         { access_config = [{ nat_ip = null, public_ptr_domain_name = null, network_tier = null }] }),
+         merge(a4high-net-1.instance_additional_networks[0],
+         { access_config = [{ nat_ip = null, public_ptr_domain_name = null, network_tier = null  }] })
+         ],
+          a4high-rdma-net.subnetwork_interfaces
         ))
 
   - id: wait-for-vms

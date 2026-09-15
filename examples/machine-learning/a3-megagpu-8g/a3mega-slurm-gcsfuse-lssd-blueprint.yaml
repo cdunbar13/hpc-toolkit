@@ -1,4 +1,4 @@
-# Copyright 2024 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,13 +24,14 @@ validators:
 
 vars:
   sys_net_range: 172.16.0.0/16
-  source_image_family: ubuntu-accelerator-2204-amd64-with-nvidia-570
-  source_image_project_id: [ubuntu-os-accelerator-images]
+  base_image:
+    project: ubuntu-os-accelerator-images
+    image: ubuntu-accelerator-2204-amd64-with-nvidia-570-v20260210
   a3mega_partition_name: a3mega
   a3mega_maintenance_interval: ""
   enable_placement: false
   local_mount_homefs: /home
-  instance_image_custom: true
+  build_slurm_from_git_ref: 6.13.1
   instance_image:
     family: $(vars.final_image_family)
     project: $(vars.project_id)
@@ -406,7 +407,7 @@ deployment_groups:
           apt-get install -y git
           ansible-galaxy role install googlecloudplatform.google_cloud_ops_agents
           ansible-pull \
-              -U https://github.com/GoogleCloudPlatform/slurm-gcp -C 6.9.1 \
+              -U https://github.com/GoogleCloudPlatform/slurm-gcp -C $(vars.build_slurm_from_git_ref) \
               -i localhost, --limit localhost --connection=local \
               -e @/var/tmp/slurm_vars.json \
               ansible/playbook.yml
@@ -479,7 +480,8 @@ deployment_groups:
               enable_nvidia_dcgm: $(vars.enable_nvidia_dcgm)
               nvidia_packages:
               - cuda-toolkit-12-8
-              - datacenter-gpu-manager
+              - datacenter-gpu-manager-4-cuda12
+              - datacenter-gpu-manager-4-dev
               - libnvidia-cfg1-570-server
               - libnvidia-nscq-570
               - nvidia-compute-utils-570-server
@@ -649,8 +651,8 @@ deployment_groups:
       # building this image does not require a GPU-enabled VM but must *not* be
       # run on a N-series VM otherwise, the "open" drivers will not install
       machine_type: c2-standard-8
-      source_image_family: $(vars.source_image_family)
-      source_image_project_id: $(vars.source_image_project_id)
+      source_image: $(vars.base_image.image)
+      source_image_project_id: [$(vars.base_image.project)]
       image_family: $(vars.final_image_family)
       disk_size: $(vars.disk_size_gb)
       omit_external_ip: false
@@ -659,7 +661,7 @@ deployment_groups:
   modules:
   # if an existing bucket is desired, follow modules/file-system/pre-existing-network-storage/README.md
   - id: data-bucket
-    source: community/modules/file-system/cloud-storage-bucket
+    source: modules/file-system/cloud-storage-bucket
     settings:
       local_mount: /gcs
       mount_options: defaults,rw,_netdev,implicit_dirs,allow_other,implicit_dirs,file_mode=777,dir_mode=777
@@ -680,7 +682,7 @@ deployment_groups:
   # the module by Filestore modules.
   # https://cloud.google.com/vpc/docs/configure-private-services-access#permissions
   - id: private_service_access
-    source: community/modules/network/private-service-access
+    source: modules/network/private-service-access
     use:
     - sysnet
   - id: homefs
@@ -802,7 +804,7 @@ deployment_groups:
       machine_type: c2-standard-8
       enable_cleanup_compute: true
       enable_external_prolog_epilog: true
-      slurm_conf_tpl: modules/embedded/community/modules/scheduler/schedmd-slurm-gcp-v6-controller/etc/long-prolog-slurm.conf.tpl
+      slurm_conf_tpl: ../_modules/embedded/community/modules/scheduler/schedmd-slurm-gcp-v6-controller/etc/long-prolog-slurm.conf.tpl
       controller_startup_script: $(controller_startup.startup_script)
       login_startup_script: $(login_startup.startup_script)
       prolog_scripts:

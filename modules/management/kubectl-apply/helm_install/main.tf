@@ -1,4 +1,4 @@
-# Copyright 2025 "Google LLC"
+# Copyright 2026 "Google LLC"
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,6 +35,15 @@ resource "helm_release" "apply_chart" {
       name  = set.value.name
       value = set.value.value
       type  = set.value.type
+    }
+  }
+
+  # Implicit dependency anchor (only add if dependencies are provided)
+  dynamic "set" {
+    for_each = length(var.dependencies) > 0 ? [1] : []
+    content {
+      name  = "tf_dependency_anchor"
+      value = join(",", var.dependencies)
     }
   }
 

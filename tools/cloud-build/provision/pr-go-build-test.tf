@@ -1,4 +1,4 @@
-# Copyright 2023 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 
 resource "google_cloudbuild_trigger" "pr_go_build_test" {
   # NOTE: make sure that go.mod:go and Makefile:MIN_GOLANG_VERSION match lowest version.
-  for_each = toset(["1.23", "1.24"])
+  for_each = toset(["1.24", "1.26"])
 
   name        = "PR-Go-${replace(each.key, ".", "-")}-build-test"
   description = "Test that the PR builds with Go ${each.key}"

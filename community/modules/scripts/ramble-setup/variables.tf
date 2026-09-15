@@ -1,5 +1,5 @@
 /**
- * Copyright 2023 Google LLC
+ * Copyright 2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ variable "install_dir" {
 
 variable "ramble_url" {
   description = "URL for Ramble repository to clone."
-  default     = "https://github.com/GoogleCloudPlatform/ramble"
+  default     = "https://github.com/Ramble-Project/ramble"
   type        = string
 }
 

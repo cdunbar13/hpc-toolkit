@@ -1,5 +1,5 @@
 /**
-  * Copyright 2023 Google LLC
+  * Copyright 2026 Google LLC
   *
   * Licensed under the Apache License, Version 2.0 (the "License");
   * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ output "cluster_id" {
 }
 
 output "gke_cluster_exists" {
-  description = "A static flag that signals to downstream modules that a cluster has been created. Needed by community/modules/scripts/kubernetes-operations."
+  description = "A static flag that signals to downstream modules that a cluster has been created."
   value       = true
   depends_on = [
     google_container_cluster.gke_cluster
@@ -54,7 +54,7 @@ locals {
   allowlist_your_ip_message = var.enable_private_endpoint ? local.private_endpoint_message : local.public_endpoint_message
   kubernetes_service_account_message = local.k8s_service_account_name == null ? "" : trimspace(
     <<-EOT
-      Use the following Kubernetes Service Account in the default namespace to run your workloads:
+      Use the following Kubernetes Service Account in the ${var.namespace} namespace to run your workloads:
         ${local.k8s_service_account_name}
       The GCP Service Account mapped to this Kubernetes Service Account is:
         ${local.sa_email}
@@ -76,6 +76,15 @@ locals {
           --project ${var.project_id}
     EOT
   )
+
+  mldiagnostics_message = !var.enable_ml_diagnostics ? "" : trimspace(
+    <<-EOT
+      ML Diagnostics has been configured:
+        - Namespace '${var.namespace}' has been labeled 'managed-mldiagnostics-gke: "true"' to enable webhook injection.
+        - Ensure workloads run in the '${var.namespace}' namespace.
+        - Ensure your workload pods use the Kubernetes Service Account configured with Workload Identity: '${local.k8s_service_account_name}'.
+    EOT
+  )
 }
 
 output "instructions" {
@@ -89,6 +98,8 @@ output "instructions" {
       ${local.kubernetes_cluster_fetch_credential_message}
 
       ${local.kubernetes_service_account_message}
+
+      ${local.mldiagnostics_message}
     EOT
   )
 }
@@ -101,4 +112,59 @@ output "k8s_service_account_name" {
 output "gke_version" {
   description = "GKE cluster's version."
   value       = google_container_cluster.gke_cluster.master_version
+}
+
+output "system_node_pool_id" {
+  description = "The ID of the system node pool."
+  value       = var.system_node_pool_enabled ? one(google_container_node_pool.system_node_pools[*].id) : null
+}
+
+output "enable_slice_controller" {
+  description = "Indicates whether the GKE Slice Controller is enabled."
+  value       = var.enable_slice_controller
+}
+
+output "namespace" {
+  description = "The namespace where Workload Identity is configured (created if not 'default')."
+  value       = var.namespace
+}
+
+output "enable_pathways_for_tpus" {
+  description = "Indicates whether Pathways for TPUs is enabled."
+  value       = var.enable_pathways_for_tpus
+}
+
+output "cluster_endpoint" {
+  description = "The IP address or endpoint of the GKE cluster control plane."
+  value       = google_container_cluster.gke_cluster.endpoint
+}
+
+output "cluster_ca_certificate" {
+  description = "The base64 encoded public certificate authority data for the GKE cluster."
+  value       = google_container_cluster.gke_cluster.master_auth[0].cluster_ca_certificate
+}
+
+output "enable_confidential_nodes" {
+  description = "Indicates whether Confidential Nodes are enabled at the cluster level."
+  value       = var.enable_confidential_nodes
+}
+
+output "confidential_instance_type" {
+  description = "The type of technology used by the confidential nodes."
+  value       = var.confidential_instance_type
+}
+
+output "enable_confidential_storage" {
+  description = "Indicates whether Confidential Storage is enabled at the cluster level."
+  value       = var.enable_confidential_storage
+}
+
+output "boot_disk_kms_key" {
+  description = "The Customer Managed Encryption Key (CMEK) used to encrypt the boot disks of the GKE nodes."
+  value       = var.boot_disk_kms_key
+}
+
+output "node_service_account" {
+  description = "The GCP Service Account email used by the GKE node pools."
+  value       = local.sa_email
 }

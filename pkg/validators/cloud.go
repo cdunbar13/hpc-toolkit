@@ -1,4 +1,4 @@
-// Copyright 2023 "Google LLC"
+// Copyright 2026 "Google LLC"
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,14 +19,23 @@ import (
 	"errors"
 	"fmt"
 	"hpc-toolkit/pkg/config"
+	"regexp"
 	"strings"
 
+	"github.com/zclconf/go-cty/cty"
 	"golang.org/x/exp/maps"
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
 	serviceusage "google.golang.org/api/serviceusage/v1"
 )
+
+var reservationNameRegex = regexp.MustCompile(`^projects/([^/]+)/reservations/([^/]+)$`)
+var resKeyRegex = regexp.MustCompile(`^(.*_)?reservation(_name)?$`)
+
+var newComputeService = func(ctx context.Context) (*compute.Service, error) {
+	return compute.NewService(ctx)
+}
 
 func getErrorReason(err googleapi.Error) (string, map[string]interface{}) {
 	for _, d := range err.Details {
@@ -69,6 +78,15 @@ func handleServiceUsageError(err error, pid string) error {
 		return nil // occurs if API list is empty and 0 APIs to validate
 	}
 	return fmt.Errorf("unhandled error: %s", herr)
+}
+
+func isValidatorExplicit(bp config.Blueprint, validatorName string) bool {
+	for _, v := range bp.Validators {
+		if v.Validator == validatorName {
+			return true
+		}
+	}
+	return false
 }
 
 // TestApisEnabled tests whether APIs are enabled in given project
@@ -239,4 +257,341 @@ func testZoneInRegion(bp config.Blueprint, inputs config.Dict) error {
 		return err
 	}
 	return TestZoneInRegion(m["project_id"], m["zone"], m["region"])
+}
+
+// Helper interface to treat Standard and Future reservations generically
+type zoneResource interface {
+	GetName() string
+	GetZone() string
+}
+
+// Wrapper for compute.Reservation
+type stdRes struct{ *compute.Reservation }
+
+func (r stdRes) GetName() string { return r.Name }
+func (r stdRes) GetZone() string { return r.Zone }
+
+// Wrapper for compute.FutureReservation
+type futRes struct{ *compute.FutureReservation }
+
+func (r futRes) GetName() string { return r.Name }
+func (r futRes) GetZone() string { return r.Zone }
+
+func extractZonesFromItems[T any](items map[string]T, name string, extractor func(T) []zoneResource) []string {
+	foundInZones := []string{}
+	for _, scopedList := range items {
+		for _, res := range extractor(scopedList) {
+			if res.GetName() == name {
+				parts := strings.Split(res.GetZone(), "/")
+				foundInZones = append(foundInZones, parts[len(parts)-1])
+			}
+		}
+	}
+	return foundInZones
+}
+
+func findReservationInOtherZones(ctx context.Context, s *compute.Service, projectID string, name string) ([]string, error) {
+	// 1. Search Standard Zonal Reservations
+	aggList, err := s.Reservations.AggregatedList(projectID).Context(ctx).Do()
+	if err == nil {
+		found := extractZonesFromItems(aggList.Items, name, func(l compute.ReservationsScopedList) []zoneResource {
+			res := make([]zoneResource, len(l.Reservations))
+			for i, r := range l.Reservations {
+				res[i] = stdRes{r}
+			}
+			return res
+		})
+		if len(found) > 0 {
+			return found, nil
+		}
+	}
+
+	// 2. Search Future Reservations (Early return if Standard found, otherwise search here)
+	fAggList, fErr := s.FutureReservations.AggregatedList(projectID).Context(ctx).Do()
+	if fErr == nil {
+		found := extractZonesFromItems(fAggList.Items, name, func(l compute.FutureReservationsScopedList) []zoneResource {
+			res := make([]zoneResource, len(l.FutureReservations))
+			for i, r := range l.FutureReservations {
+				res[i] = futRes{r}
+			}
+			return res
+		})
+		if len(found) > 0 {
+			return found, nil
+		}
+	}
+
+	// If both failed and we found nothing, return the errors
+	if err != nil || fErr != nil {
+		return nil, fmt.Errorf("failed to list standard reservations: %v; failed to list future reservations: %v", err, fErr)
+	}
+
+	return []string{}, nil
+}
+
+// TestReservationExists checks if a reservation exists in a project and zone.
+func TestReservationExists(ctx context.Context, reservationProjectID string, zone string, reservationName string, deploymentProjectID string) error {
+	if reservationName == "" {
+		return nil
+	}
+
+	s, err := newComputeService(ctx)
+	if err != nil {
+		return handleClientError(err)
+	}
+
+	// 1. Direct check: Try Standard Zonal Reservation
+	_, err = s.Reservations.Get(reservationProjectID, zone, reservationName).Context(ctx).Do()
+	if err == nil {
+		return nil
+	}
+
+	// 2. Fallback: Try Future Reservation (Required for Blackwell/A4 hardware)
+	_, fErr := s.FutureReservations.Get(reservationProjectID, zone, reservationName).Context(ctx).Do()
+	if fErr == nil {
+		return nil
+	}
+
+	// 3. Access Check: If both failed, check for metadata blindness (403/400).
+	// We handle this because users might be allowed to CONSUME but not DESCRIBE a shared reservation.
+	// Case A: Standard API Access Check
+	if msg, isSoft := getSoftWarningMessage(err, "test_reservation_exists", reservationProjectID, "Compute Engine API", "compute.reservations.get"); isSoft {
+		fmt.Println(msg)
+		return nil
+	}
+
+	// Case B: Future API Access Check
+	if msg, isSoft := getSoftWarningMessage(fErr, "test_reservation_exists", reservationProjectID, "Compute Engine API", "compute.futureReservations.get"); isSoft {
+		fmt.Println(msg)
+		return nil
+	}
+
+	// 4. Diagnostic Search: The reservation was not in the expected zone (404).
+	// We try to find where it actually is.
+	foundInZones, aggErr := findReservationInOtherZones(ctx, s, reservationProjectID, reservationName)
+
+	if aggErr != nil {
+		// If Discovery fails (403/400) and it's a SHARED project, we must skip
+		// because we can't prove the user has a typo; we just can't list resources.
+		if reservationProjectID != deploymentProjectID {
+			fmt.Printf("\n[!] WARNING: Shared reservation %q was not found in zone %q.\n", reservationName, zone)
+			fmt.Printf("    Discovery in other zones of project %q failed due to restricted permissions: %v\n", reservationProjectID, aggErr)
+			fmt.Printf("    Skipping this check as consumption may still be possible.\n")
+			return nil
+		}
+
+		// For Local Project: If List fails, we report the original 404 but note the permission issue.
+		var gerr *googleapi.Error
+		if errors.As(aggErr, &gerr) && (gerr.Code == 403 || gerr.Code == 400) {
+			return fmt.Errorf("reservation %q not found in zone %q (Note: identity lacks permission to search other zones)", reservationName, zone)
+		}
+		return fmt.Errorf("reservation %q not found in project %q and zone %q", reservationName, reservationProjectID, zone)
+	}
+
+	// 5. Resource Found Discovery: Provide Hint
+	if len(foundInZones) > 0 {
+		zonesList := strings.Join(foundInZones, ", ")
+		return config.HintError{
+			Err: fmt.Errorf("reservation %q exists in project %q, but in zone(s) [%s] instead of %q",
+				reservationName, reservationProjectID, zonesList, zone),
+			Hint: fmt.Sprintf("Change the zone in your blueprint to one of [%s], or use a reservation that is located in zone %q.",
+				zonesList, zone),
+		}
+	}
+
+	// 6. Not Found Anywhere: Hard Failure
+	return fmt.Errorf("reservation %q was not found in any zone of project %q", reservationName, reservationProjectID)
+}
+
+// findReservationOwnerProject scans the blueprint's modules to see if a specific
+// reservation is configured as a shared reservation (meaning it has an explicit
+// 'project' field defined in its 'reservation_affinity' settings).
+// If found, it returns the owner project ID; otherwise, it returns an empty string.
+func findReservationOwnerProject(bp config.Blueprint, reservationName string) string {
+	var ownerProject string
+	// Walk through all modules in the blueprint to inspect their settings
+	bp.WalkModulesSafe(func(_ config.ModulePath, m *config.Module) {
+		// Short-circuit if we already found the owner project in a previous module
+		if ownerProject != "" {
+			return
+		}
+		ownerProject = extractOwnerProjectFromModule(bp, m, reservationName)
+	})
+	return ownerProject
+}
+
+// extractOwnerProjectFromModule evaluates the 'reservation_affinity' setting of a module
+// and attempts to extract the owner project if it matches the target reservation.
+func extractOwnerProjectFromModule(bp config.Blueprint, m *config.Module, reservationName string) string {
+	settings := m.Settings
+	if !settings.Has("reservation_affinity") {
+		return ""
+	}
+	val := settings.Get("reservation_affinity")
+	v, err := bp.Eval(val)
+	if err != nil || v.IsNull() {
+		return ""
+	}
+	v, _ = v.Unmark()
+	if !v.IsKnown() || !v.Type().IsObjectType() {
+		return ""
+	}
+	attrs := v.AsValueMap()
+	specRes, ok := attrs["specific_reservations"]
+	if !ok {
+		return ""
+	}
+	return findProjectInSpecificReservations(specRes, reservationName)
+}
+
+// findProjectInSpecificReservations iterates over the 'specific_reservations' list
+// to find a reservation matching the target name and returns its owner project.
+func findProjectInSpecificReservations(specRes cty.Value, reservationName string) string {
+	specRes, _ = specRes.Unmark()
+	if specRes.IsNull() || !specRes.IsKnown() {
+		return ""
+	}
+	if !specRes.Type().IsListType() && !specRes.Type().IsTupleType() {
+		return ""
+	}
+	iterator := specRes.ElementIterator()
+	for iterator.Next() {
+		_, resVal := iterator.Element()
+		if proj := getProjectIfReservationMatches(resVal, reservationName); proj != "" {
+			return proj
+		}
+	}
+	return ""
+}
+
+// getProjectIfReservationMatches checks if a single reservation object matches the
+// target name and returns its owner project if specified.
+func getProjectIfReservationMatches(resVal cty.Value, reservationName string) string {
+	resVal, _ = resVal.Unmark()
+	if resVal.IsNull() || !resVal.IsKnown() || !resVal.Type().IsObjectType() {
+		return ""
+	}
+	resAttrs := resVal.AsValueMap()
+	nameVal := strings.Split(getSafeString(resAttrs, "name"), "/reservationBlocks/")[0]
+	if nameVal != reservationName {
+		return ""
+	}
+	return getSafeString(resAttrs, "project")
+}
+
+// getSafeString extracts a string value from a cty.Value map by key, returning
+// an empty string if the key is missing, null, or not of type string.
+func getSafeString(attrs map[string]cty.Value, key string) string {
+	val, ok := attrs[key]
+	if !ok {
+		return ""
+	}
+	val, _ = val.Unmark()
+	if val.Type() != cty.String || val.IsNull() || !val.IsKnown() {
+		return ""
+	}
+	return val.AsString()
+}
+
+func testReservationExists(bp config.Blueprint, inputs config.Dict) error {
+	if err := checkInputs(inputs, []string{"project_id", "zone", "reservation_name"}); err != nil {
+		return err
+	}
+	inputMap, err := inputsAsStrings(inputs)
+	if err != nil {
+		return err
+	}
+
+	// The primary project defined in the blueprint vars
+	deploymentProjectID := inputMap["project_id"]
+	zone := inputMap["zone"]
+	resInput := inputMap["reservation_name"]
+
+	if resInput == "" {
+		return nil
+	}
+
+	// Handle hierarchical formats
+	resInput = strings.Split(resInput, "/reservationBlocks/")[0]
+
+	// Determine if it's a Shared Reservation path or a simple name
+	matches := reservationNameRegex.FindStringSubmatch(resInput)
+	reservationProjectID := deploymentProjectID
+	targetName := resInput
+
+	if len(matches) == 3 {
+		// The input is a full resource path, indicating a shared reservation.
+		// Use the project ID extracted from the path instead of the deployment project.
+		reservationProjectID = matches[1]
+		targetName = matches[2]
+	} else {
+		// It's a simple name. Check if we can find an owner project in the blueprint modules.
+		if ownerProj := findReservationOwnerProject(bp, resInput); ownerProj != "" {
+			reservationProjectID = ownerProj
+		}
+	}
+
+	// Pass context from the caller to ensure cancellation/timeouts are respected
+	ctx := context.Background()
+	return TestReservationExists(ctx, reservationProjectID, zone, targetName, deploymentProjectID)
+}
+
+// testResourceInZoneAvailability is a generic helper that validates a resource type
+// (like machine_type or disk_type) across a blueprint's modules or via an explicit validator.
+func testResourceInZoneAvailability(
+	bp config.Blueprint,
+	inputs config.Dict,
+	validatorName string,
+	settingSuffix string,
+	resourceLabel string,
+	validateFn func(s *compute.Service, projectID, zone, name, vName string) error,
+) error {
+	// 1. Determine if the validator was explicitly added to the blueprint YAML
+	required := []string{"project_id", "zone"}
+	if isValidatorExplicit(bp, validatorName) {
+		required = append(required, settingSuffix)
+	}
+
+	if err := checkInputs(inputs, required); err != nil {
+		return err
+	}
+
+	// Initialize Compute API service
+	s, err := compute.NewService(context.Background())
+	if err != nil {
+		return handleClientError(err)
+	}
+	m, err := inputsAsStrings(inputs)
+	if err != nil {
+		return err
+	}
+
+	projectID, globalZone, explicitValue := m["project_id"], m["zone"], m[settingSuffix]
+
+	// 2. Handle Explicit case: User manually defined the validator in the YAML
+	if explicitValue != "" {
+		if err := TestZoneExists(projectID, globalZone); err != nil {
+			return err
+		}
+		err := validateFn(s, projectID, globalZone, explicitValue, validatorName)
+		if errors.Is(err, errSoftWarning) {
+			return nil
+		}
+		return err
+	}
+
+	// 3. Case: Implicitly check all modules for this setting
+	return validateSettingsInModules(bp, globalZone, projectID, settingSuffix, resourceLabel, validatorName, func(z, name string, vName string) error {
+		return validateFn(s, projectID, z, name, vName)
+	})
+}
+
+// testMachineTypeInZoneAvailability automatically validates machine types in modules
+func testMachineTypeInZoneAvailability(bp config.Blueprint, inputs config.Dict) error {
+	return testResourceInZoneAvailability(bp, inputs, "test_machine_type_in_zone", "machine_type", "machine type", validateMachineTypeInZone)
+}
+
+// testDiskTypeInZoneAvailability automatically validates disk types in modules
+func testDiskTypeInZoneAvailability(bp config.Blueprint, inputs config.Dict) error {
+	return testResourceInZoneAvailability(bp, inputs, "test_disk_type_in_zone", "disk_type", "disk type", validateDiskTypeInZone)
 }

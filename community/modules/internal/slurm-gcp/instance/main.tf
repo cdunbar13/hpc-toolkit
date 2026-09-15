@@ -1,6 +1,6 @@
 /**
  * Copyright (C) SchedMD LLC.
- * Copyright 2018 Google LLC
+ * Copyright 2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -111,6 +111,7 @@ resource "google_compute_instance_from_template" "slurm_instance" {
       queue_count        = nic.value.queue_count
       subnetwork         = nic.value.subnetwork
       subnetwork_project = nic.value.subnetwork_project
+      stack_type         = nic.value.stack_type
     }
   }
 
@@ -118,7 +119,6 @@ resource "google_compute_instance_from_template" "slurm_instance" {
   # Due to https://github.com/hashicorp/terraform-provider-google/issues/21693
   # we have to explicitly override instance labels instead of inheriting them from template.
   labels = data.google_compute_instance_template.base.labels
-
 
   lifecycle {
     replace_triggered_by = [null_resource.replace_trigger.id]

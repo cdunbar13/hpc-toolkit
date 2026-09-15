@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2022 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -98,7 +98,6 @@ HPL.out      output file name (if any)
 
 
 def mem_per_core():
-    from multiprocessing import cpu_count
     nCPU = cpu_count()
 
     MemTotal = None

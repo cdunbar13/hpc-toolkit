@@ -1,5 +1,5 @@
 <!--
- Copyright 2025 "Google LLC"
+ Copyright 2026 "Google LLC"
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -23,13 +23,13 @@
         {% for build in image.builds %}
             <div id="build-status-{{ build.build_id }}">
                 {% if build.status == "n" %}
-                    <img src="/static/img/status-configured.png" style="width:30px;height:32px;">
+                    <img src="/static/img/status-configured.png" style="width:30px;height:32px;" alt="">
                 {% elif build.status == "i" %}
-                    <img src="/static/img/loading.gif" style="width:32px;height:32px;">
+                    <img src="/static/img/loading.gif" style="width:32px;height:32px;" alt="">
                 {% elif build.status == "s" %}
-                    <img src="/static/img/status-ready.png" style="width:32px;height:32px;">
+                    <img src="/static/img/status-ready.png" style="width:32px;height:32px;" alt="">
                 {% elif build.status == "f" %}
-                    <img src="/static/img/status-error.png" style="width:30px;height:20px;">
+                    <img src="/static/img/status-error.png" style="width:30px;height:20px;" alt="">
                 {% endif %}
                 {{ build.status|friendly_build_status }} ({{ build.build_id|slice:":8" }})
             </div>

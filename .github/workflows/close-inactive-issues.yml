@@ -1,4 +1,4 @@
-# Copyright 2023 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ jobs:
       issues: write
       pull-requests: write
     steps:
-    - uses: actions/stale@v5
+    - uses: actions/stale@1e223db275d687790206a7acac4d1a11bd6fe629 # v10
       with:
         days-before-issue-stale: 30
         days-before-issue-close: 14

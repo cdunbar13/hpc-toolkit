@@ -35,7 +35,7 @@ The following example will create a single GPU accelerated remote desktop.
 ## License
 
 <!-- BEGINNING OF PRE-COMMIT-TERRAFORM DOCS HOOK -->
-Copyright 2022 Google LLC
+Copyright 2026 Google LLC
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -52,8 +52,8 @@ limitations under the License.
 ## Requirements
 
 | Name | Version |
-|------|---------|
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 0.12.31 |
+| ---- | ------- |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.12.2 |
 
 ## Providers
 
@@ -62,7 +62,7 @@ No providers.
 ## Modules
 
 | Name | Source | Version |
-|------|--------|---------|
+| ---- | ------ | ------- |
 | <a name="module_client_startup_script"></a> [client\_startup\_script](#module\_client\_startup\_script) | ../../../../modules/scripts/startup-script | n/a |
 | <a name="module_instances"></a> [instances](#module\_instances) | ../../../../modules/compute/vm-instance | n/a |
 
@@ -73,7 +73,7 @@ No resources.
 ## Inputs
 
 | Name | Description | Type | Default | Required |
-|------|-------------|------|---------|:--------:|
+| ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_add_deployment_name_before_prefix"></a> [add\_deployment\_name\_before\_prefix](#input\_add\_deployment\_name\_before\_prefix) | If true, the names of VMs and disks will always be prefixed with `deployment_name` to enable uniqueness across deployments.<br/>See `name_prefix` for further details on resource naming behavior. | `bool` | `false` | no |
 | <a name="input_auto_delete_boot_disk"></a> [auto\_delete\_boot\_disk](#input\_auto\_delete\_boot\_disk) | Controls if boot disk should be auto-deleted when instance is deleted. | `bool` | `true` | no |
 | <a name="input_bandwidth_tier"></a> [bandwidth\_tier](#input\_bandwidth\_tier) | Tier 1 bandwidth increases the maximum egress bandwidth for VMs.<br/>  Using the `tier_1_enabled` setting will enable both gVNIC and TIER\_1 higher bandwidth networking.<br/>  Using the `gvnic_enabled` setting will only enable gVNIC and will not enable TIER\_1.<br/>  Note that TIER\_1 only works with specific machine families & shapes and must be using an image th<br/>at supports gVNIC. See [official docs](https://cloud.google.com/compute/docs/networking/configure-v<br/>m-with-high-bandwidth-configuration) for more details. | `string` | `"not_enabled"` | no |
@@ -85,7 +85,7 @@ No resources.
 | <a name="input_guest_accelerator"></a> [guest\_accelerator](#input\_guest\_accelerator) | List of the type and count of accelerator cards attached to the instance. Requires virtual workstation accelerator if Nvidia Grid Drivers are required | <pre>list(object({<br/>    type  = string,<br/>    count = number<br/>  }))</pre> | <pre>[<br/>  {<br/>    "count": 1,<br/>    "type": "nvidia-tesla-t4-vws"<br/>  }<br/>]</pre> | no |
 | <a name="input_install_nvidia_driver"></a> [install\_nvidia\_driver](#input\_install\_nvidia\_driver) | Installs the nvidia driver (true/false). For details, see https://cloud.google.com/compute/docs/gpus/install-drivers-gpu | `bool` | n/a | yes |
 | <a name="input_instance_count"></a> [instance\_count](#input\_instance\_count) | Number of instances | `number` | `1` | no |
-| <a name="input_instance_image"></a> [instance\_image](#input\_instance\_image) | Image used to build chrome remote desktop node. The default image is<br/>name="debian-12-bookworm-v20250415" and project="debian-cloud".<br/>NOTE: uses fixed version of image to avoid NVIDIA driver compatibility issues.<br/><br/>An alternative image is from name="ubuntu-2204-jammy-v20240126" and project="ubuntu-os-cloud".<br/><br/>Expected Fields:<br/>name: The name of the image. Mutually exclusive with family.<br/>family: The image family to use. Mutually exclusive with name.<br/>project: The project where the image is hosted. | `map(string)` | <pre>{<br/>  "name": "debian-12-bookworm-v20250415",<br/>  "project": "debian-cloud"<br/>}</pre> | no |
+| <a name="input_instance_image"></a> [instance\_image](#input\_instance\_image) | Image used to build chrome remote desktop node. The default image is<br/>name="debian-12-bookworm-v20250610" and project="debian-cloud".<br/>NOTE: uses fixed version of image to avoid NVIDIA driver compatibility issues.<br/><br/>An alternative image is from name="ubuntu-2204-jammy-v20240126" and project="ubuntu-os-cloud".<br/><br/>Expected Fields:<br/>name: The name of the image. Mutually exclusive with family.<br/>family: The image family to use. Mutually exclusive with name.<br/>project: The project where the image is hosted. | `map(string)` | <pre>{<br/>  "name": "debian-12-bookworm-v20250610",<br/>  "project": "debian-cloud"<br/>}</pre> | no |
 | <a name="input_labels"></a> [labels](#input\_labels) | Labels to add to the instances. Key-value pairs. | `map(string)` | `{}` | no |
 | <a name="input_machine_type"></a> [machine\_type](#input\_machine\_type) | Machine type to use for the instance creation. Must be N1 family if GPU is used. | `string` | `"n1-standard-8"` | no |
 | <a name="input_metadata"></a> [metadata](#input\_metadata) | Metadata, provided as a map | `map(string)` | `{}` | no |
@@ -107,7 +107,7 @@ No resources.
 ## Outputs
 
 | Name | Description |
-|------|-------------|
+| ---- | ----------- |
 | <a name="output_instance_name"></a> [instance\_name](#output\_instance\_name) | Name of the first instance created, if any. |
 | <a name="output_startup_script"></a> [startup\_script](#output\_startup\_script) | script to load and run all runners, as a string value. |
 <!-- END OF PRE-COMMIT-TERRAFORM DOCS HOOK -->

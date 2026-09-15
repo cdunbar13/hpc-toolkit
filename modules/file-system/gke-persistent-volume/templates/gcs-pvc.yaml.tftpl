@@ -3,6 +3,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: ${pvc_name}
+  namespace: ${namespace}
   labels:
   %{~ for key, val in labels ~}
     ${key}: ${val}
@@ -10,8 +11,11 @@ metadata:
 spec:
   accessModes:
   - ReadWriteMany
-  storageClassName: ""
+  storageClassName: "${storage_class_name != null ? storage_class_name : ""}"
   volumeName: ${pv_name}
   resources:
     requests:
       storage: ${capacity}
+  claimRef:
+    name: ${pvc_name}
+    namespace: ${namespace}

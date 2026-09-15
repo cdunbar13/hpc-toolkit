@@ -1,4 +1,4 @@
-# Copyright 2022 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -612,7 +612,7 @@ class Image(CloudResource):
         max_length=60,
         help_text="Enter a source image family",
         blank=False,
-        default="slurm-gcp-6-5-hpc-rocky-linux-8",
+        default="slurm-gcp-6-12-hpc-rocky-linux-9",
     )
 
     startup_script = models.ManyToManyField(
@@ -709,6 +709,14 @@ class Cluster(CloudResource):
         choices=CLUSTER_STATUS,
         default="n",
         help_text="Status of this cluster",
+    )
+    initialization_started = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "When the cluster last entered the initialising state. Used to "
+            "detect a bootstrap that has stalled with no error."
+        ),
     )
     spackdir = models.CharField(
         max_length=4096,
@@ -815,6 +823,12 @@ class Cluster(CloudResource):
         help_text=(
             "Enable containers for this cluster? Artifact Registry can be configured to store your containers."
         ),        
+    )
+    enable_slurm_auth = models.BooleanField(
+        default=True,
+        help_text=(
+            "Enable Slurm native authentication instead of MUNGE."
+        ),
     )
 
     def get_access_key(self):

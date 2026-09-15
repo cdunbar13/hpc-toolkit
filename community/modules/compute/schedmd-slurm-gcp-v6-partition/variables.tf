@@ -1,4 +1,4 @@
-# Copyright 2023 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,8 +17,8 @@ variable "partition_name" {
   type        = string
 
   validation {
-    condition     = can(regex("^[a-z](?:[a-z0-9]*)$", var.partition_name))
-    error_message = "Variable 'partition_name' must be a match of regex '^[a-z](?:[a-z0-9]*)$'."
+    condition     = can(regex("^[a-z](?:[a-z0-9-]*)$", var.partition_name))
+    error_message = "Variable 'partition_name' must be a match of regex '^[a-z](?:[a-z0-9-]*)$'."
   }
 }
 
@@ -64,37 +64,44 @@ variable "nodeset" {
       device_name                = optional(string)
       disk_size_gb               = optional(number)
       disk_type                  = optional(string)
+      disk_storage_pool          = optional(string)
       disk_labels                = optional(map(string), {})
       auto_delete                = optional(bool, true)
       boot                       = optional(bool, false)
       disk_resource_manager_tags = optional(map(string), {})
     })), [])
-    bandwidth_tier                   = optional(string, "platform_default")
-    can_ip_forward                   = optional(bool, false)
-    disk_auto_delete                 = optional(bool, true)
-    disk_labels                      = optional(map(string), {})
-    disk_resource_manager_tags       = optional(map(string), {})
-    disk_size_gb                     = optional(number)
-    disk_type                        = optional(string)
-    enable_confidential_vm           = optional(bool, false)
-    enable_placement                 = optional(bool, false)
-    placement_max_distance           = optional(number, null)
-    enable_oslogin                   = optional(bool, true)
-    enable_shielded_vm               = optional(bool, false)
-    enable_maintenance_reservation   = optional(bool, false)
-    enable_opportunistic_maintenance = optional(bool, false)
+    bandwidth_tier                      = optional(string, "platform_default")
+    can_ip_forward                      = optional(bool, false)
+    disk_auto_delete                    = optional(bool, true)
+    disk_labels                         = optional(map(string), {})
+    disk_resource_manager_tags          = optional(map(string), {})
+    disk_size_gb                        = optional(number)
+    disk_type                           = optional(string)
+    disk_storage_pool                   = optional(string)
+    disk_encryption_key                 = optional(string)
+    disk_encryption_key_service_account = optional(string)
+    enable_confidential_vm              = optional(bool, false)
+    confidential_instance_type          = optional(string)
+    enable_placement                    = optional(bool, false)
+    placement_max_distance              = optional(number, null)
+    enable_oslogin                      = optional(bool, true)
+    enable_shielded_vm                  = optional(bool, false)
+    enable_maintenance_reservation      = optional(bool, false)
+    enable_opportunistic_maintenance    = optional(bool, false)
     gpu = optional(object({
       count = number
       type  = string
     }))
+    accelerator_topology = optional(string, null)
     dws_flex = object({
       enabled          = bool
       max_run_duration = number
       use_job_duration = bool
       use_bulk_insert  = bool
     })
-    labels       = optional(map(string), {})
-    machine_type = optional(string)
+    provisioning_engine = optional(string, "AUTO")
+    labels              = optional(map(string), {})
+    machine_type        = optional(string)
     advanced_machine_features = object({
       enable_nested_virtualization = optional(bool)
       threads_per_core             = optional(number)
@@ -109,13 +116,15 @@ variable "nodeset" {
     min_cpu_platform         = optional(string)
     network_tier             = optional(string, "STANDARD")
     network_storage = optional(list(object({
-      server_ip             = string
-      remote_mount          = string
-      local_mount           = string
-      fs_type               = string
-      mount_options         = string
-      client_install_runner = optional(map(string))
-      mount_runner          = optional(map(string))
+      server_ip               = string
+      remote_mount            = string
+      local_mount             = string
+      local_mount_owner       = optional(string)
+      local_mount_permissions = optional(string)
+      fs_type                 = string
+      mount_options           = string
+      client_install_runner   = optional(map(string))
+      mount_runner            = optional(map(string))
     })), [])
     on_host_maintenance   = optional(string)
     preemptible           = optional(bool, false)
@@ -201,11 +210,13 @@ variable "nodeset_tpu" {
     data_disks   = optional(list(string), [])
     docker_image = optional(string, "")
     network_storage = optional(list(object({
-      server_ip     = string
-      remote_mount  = string
-      local_mount   = string
-      fs_type       = string
-      mount_options = string
+      server_ip               = string
+      remote_mount            = string
+      local_mount             = string
+      local_mount_owner       = optional(string)
+      local_mount_permissions = optional(string)
+      fs_type                 = string
+      mount_options           = string
     })), [])
     subnetwork = string
     service_account = optional(object({
@@ -291,13 +302,15 @@ variable "suspend_timeout" {
 variable "network_storage" {
   description = "DEPRECATED"
   type = list(object({
-    server_ip             = string,
-    remote_mount          = string,
-    local_mount           = string,
-    fs_type               = string,
-    mount_options         = string,
-    client_install_runner = map(string)
-    mount_runner          = map(string)
+    server_ip               = string,
+    remote_mount            = string,
+    local_mount             = string,
+    local_mount_owner       = optional(string)
+    local_mount_permissions = optional(string)
+    fs_type                 = string,
+    mount_options           = string,
+    client_install_runner   = map(string)
+    mount_runner            = map(string)
   }))
   default = []
   validation {

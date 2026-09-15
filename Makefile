@@ -1,14 +1,14 @@
 # PREAMBLE
-MIN_PACKER_VERSION=1.7.9 # for building images
-MIN_TERRAFORM_VERSION=1.5.7 # for deploying modules
-MIN_GOLANG_VERSION=1.23 # for building gcluster
+MIN_PACKER_VERSION=1.15.3 # for building images
+MIN_TERRAFORM_VERSION=1.12.2 # for deploying modules
+MIN_GOLANG_VERSION=1.26 # for building gcluster
 
 .PHONY: install install-user tests format install-dev-deps \
         warn-go-missing warn-terraform-missing warn-packer-missing \
         warn-go-version warn-terraform-version warn-packer-version \
         test-engine validate_configs validate_golden_copy packer-check \
         terraform-format packer-format mypy \
-        check-tflint check-pre-commit
+        check-tflint check-pre-commit ci-tests
 
 SHELL=/bin/bash -o pipefail
 ENG = ./cmd/... ./pkg/...
@@ -16,6 +16,7 @@ TERRAFORM_FOLDERS=$(shell find ./modules ./community/modules ./tools -type f -na
 PACKER_FOLDERS=$(shell find ./modules ./community/modules ./tools -type f -name "*.pkr.hcl" -not -path '*/\.*' -exec dirname "{}" \; | sort -u)
 BINARY_TARGETS := ghpc gcluster
 INSTALL_DIRS := . ~/bin /usr/local/bin
+INSTALLATION_MODE = SOURCE
 
 ifneq (, $(shell which git))
 ## GIT IS PRESENT
@@ -33,7 +34,7 @@ endif
 
 gcluster: warn-go-version warn-terraform-version warn-packer-version $(shell find ./cmd ./pkg gcluster.go -type f)
 	$(info **************** building gcluster ************************)
-	@go build -ldflags="-X 'main.gitTagVersion=$(GIT_TAG_VERSION)' -X 'main.gitBranch=$(GIT_BRANCH)' -X 'main.gitCommitInfo=$(GIT_COMMIT_INFO)' -X 'main.gitCommitHash=$(GIT_COMMIT_HASH)' -X 'main.gitInitialHash=$(GIT_INITIAL_HASH)'" gcluster.go
+	@CGO_ENABLED=0 go build -ldflags="-X 'main.gitTagVersion=$(GIT_TAG_VERSION)' -X 'main.gitBranch=$(GIT_BRANCH)' -X 'main.gitCommitInfo=$(GIT_COMMIT_INFO)' -X 'main.gitCommitHash=$(GIT_COMMIT_HASH)' -X 'main.gitInitialHash=$(GIT_INITIAL_HASH)' -X 'main.gitIsOfficial=$(GIT_IS_OFFICIAL)' -X 'main.installationMode=$(INSTALLATION_MODE)'" gcluster.go
 	@ln -sf gcluster ghpc
 
 ghpc: gcluster
@@ -68,12 +69,12 @@ install-dev-deps: warn-terraform-version warn-packer-version check-pre-commit ch
 	go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
 	go install github.com/go-critic/go-critic/cmd/gocritic@latest
 	go install github.com/google/addlicense@latest
-	go install mvdan.cc/sh/v3/cmd/shfmt@latest
-	go install golang.org/x/tools/cmd/goimports@latest
+	go install mvdan.cc/sh/v3/cmd/shfmt@v3.12.0
+	go install golang.org/x/tools/cmd/goimports@v0.42.0
 	go install honnef.co/go/tools/cmd/staticcheck@latest
-	pip install -r community/modules/scheduler/schedmd-slurm-gcp-v6-controller/modules/slurm_files/scripts/requirements.txt
+	go install github.com/jstemmer/go-junit-report/v2@latest
 	pip install -r community/modules/scheduler/schedmd-slurm-gcp-v6-controller/modules/slurm_files/scripts/requirements-dev.txt
-	pip install mypy
+	pip install mypy==1.18.2
 
 
 clean:
@@ -93,6 +94,9 @@ clean:
 	done
 
 # RULES SUPPORTING THE ABOVE
+ci-tests: warn-go-missing
+	$(info **************** running gcluster unit tests for CI **************)
+	go test -v $(ENG) | go-junit-report > test-results.xml
 
 test-engine: warn-go-missing
 	$(info **************** vetting go code **********************)
@@ -252,3 +256,17 @@ packer-format:
 endif
 endif
 # END OF PACKER SECTION
+
+###################################
+# AGENT SKILLS SECTION
+.PHONY: lint-skills test-skills
+
+lint-skills:
+	$(info **************** linting agent skills ***************)
+	@python3 tools/run_eval.py --lint-only --all
+
+test-skills:
+	$(info **************** running skills unit tests and evals ***************)
+	@python3 tools/tests/test_run_eval.py
+	@python3 tools/run_eval.py --all
+# END OF AGENT SKILLS SECTION

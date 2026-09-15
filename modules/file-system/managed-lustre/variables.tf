@@ -1,5 +1,5 @@
 /**
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -74,7 +74,18 @@ variable "local_mount" {
 variable "size_gib" {
   description = "Storage size of the Managed Lustre instance in GB. See https://cloud.google.com/managed-lustre/docs/create-instance for limitations"
   type        = number
-  default     = 18000
+  default     = 36000
+}
+
+variable "per_unit_storage_throughput" {
+  description = "Throughput of the instance in MB/s/TiB. Valid values are 125, 250, 500, 1000. If enable_dynamic_tier is false, this defaults to 500."
+  type        = number
+  default     = null
+
+  validation {
+    condition     = var.per_unit_storage_throughput == null || contains([125, 250, 500, 1000], var.per_unit_storage_throughput)
+    error_message = "Throughput must be null or one of: 125, 250, 500, 1000."
+  }
 }
 
 variable "labels" {
@@ -91,7 +102,7 @@ variable "mount_options" {
 variable "private_vpc_connection_peering" {
   description = <<-EOT
     The name of the VPC Network peering connection.
-    If using new VPC, please use community/modules/network/private-service-access to create private-service-access and
+    If using new VPC, please use modules/network/private-service-access to create private-service-access and
     If using existing VPC with private-service-access enabled, set this manually."
     EOT
   type        = string
@@ -122,4 +133,16 @@ variable "import_gcs_bucket_uri" {
     condition     = startswith(coalesce(var.import_gcs_bucket_uri, "gs://"), "gs://")
     error_message = "The GCS bucket uri must start with 'gs://'"
   }
+}
+
+variable "kms_key" {
+  description = "The resource ID of a Customer-Managed Encryption Key (CMEK) to use for the Lustre instance. In the format: projects/<project_id>/locations/<location>/keyRings/<key_ring>/cryptoKeys/<key_name>"
+  type        = string
+  default     = null
+}
+
+variable "enable_dynamic_tier" {
+  description = "Set to true to enable Dynamic Tier for the Lustre instance."
+  type        = bool
+  default     = false
 }

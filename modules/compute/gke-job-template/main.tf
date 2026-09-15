@@ -1,5 +1,5 @@
 /**
-  * Copyright 2023 Google LLC
+  * Copyright 2026 Google LLC
   *
   * Licensed under the Apache License, Version 2.0 (the "License");
   * you may not use this file except in compliance with the License.
@@ -17,6 +17,18 @@
 locals {
   # This label allows for billing report tracking based on module.
   labels = merge(var.labels, { ghpc_module = "gke-job-template", ghpc_role = "compute" })
+}
+
+locals {
+  tpu_accelerator_node_selector = var.tpu_accelerator_type[0] != null ? [{
+    key   = "cloud.google.com/gke-tpu-accelerator"
+    value = var.tpu_accelerator_type[0]
+  }] : []
+
+  tpu_topology_node_selector = var.tpu_topology[0] != null ? [{
+    key   = "cloud.google.com/gke-tpu-topology"
+    value = var.tpu_topology[0]
+  }] : []
 }
 
 locals {
@@ -102,16 +114,25 @@ locals {
     }
   ]
 
-  suffix = var.random_name_sufix ? "-${random_id.resource_name_suffix.hex}" : ""
+  suffix = var.random_name_suffix ? "-${random_id.resource_name_suffix.hex}" : ""
   machine_family_node_selector = var.machine_family != null ? [{
     key   = "cloud.google.com/machine-family"
     value = var.machine_family
   }] : []
-  node_selectors = concat(local.machine_family_node_selector, local.local_ssd_node_selector, var.node_selectors)
+  node_selectors = concat(local.machine_family_node_selector, local.local_ssd_node_selector, local.tpu_accelerator_node_selector, local.tpu_topology_node_selector, var.node_selectors)
 
   any_gcs = anytrue([for pvc in var.persistent_volume_claims :
-    pvc.is_gcs
+    pvc.storage_type == "gcs"
   ])
+
+  dranet_template_name_distinct = distinct(compact(var.dranet_template_name))
+  dranet_template_name_actual   = length(local.dranet_template_name_distinct) > 0 ? local.dranet_template_name_distinct[0] : "default-rdma"
+
+  default_resource_claims = anytrue(var.enable_dranet) ? [{ name = "dranet-network", resource_claim_template_name = local.dranet_template_name_actual }] : []
+  default_claims          = anytrue(var.enable_dranet) ? [{ name = "dranet-network" }] : []
+
+  resource_claims_actual = length(var.resource_claims) > 0 ? var.resource_claims : local.default_resource_claims
+  claims_actual          = length(var.claims) > 0 ? var.claims : local.default_claims
 
   job_template_contents = templatefile(
     "${path.module}/templates/gke-job-base.yaml.tftpl",
@@ -125,6 +146,7 @@ locals {
       k8s_service_account_name = var.k8s_service_account_name
       node_pool_names          = var.node_pool_names
       node_selectors           = local.node_selectors
+      tpu_limit                = var.tpu_chips_per_node[0]
       full_node_request        = local.full_node_request
       cpu_request              = local.cpu_request_string
       gpu_limit                = local.gpu_limit_string
@@ -141,6 +163,8 @@ locals {
       memory_request       = local.memory_request_string
       ephemeral_request    = local.ephemeral_request_string
       gcs_annotation       = local.any_gcs
+      resource_claims      = local.resource_claims_actual
+      claims               = local.claims_actual
     }
   )
 
@@ -165,4 +189,5 @@ resource "local_file" "job_template" {
       error_message = "When using GCS, a kubernetes service account with workload identity is required. gke-cluster module will perform this setup when var.configure_workload_identity_sa is set to true."
     }
   }
+
 }

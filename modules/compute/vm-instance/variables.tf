@@ -1,5 +1,5 @@
 /**
- * Copyright 2022 Google LLC
+ * Copyright 2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ variable "instance_image" {
   type        = map(string)
   default = {
     project = "cloud-hpc-image-public"
-    family  = "hpc-rocky-linux-8"
+    family  = "hpc-rocky-linux-9"
   }
 
   validation {
@@ -62,6 +62,12 @@ variable "auto_delete_boot_disk" {
   default     = true
 }
 
+variable "disk_storage_pool" {
+  description = "Storage pool to use for the boot disk. Note that storage pools are only supported with Hyperdisk types. For boot disks, only hyperdisk-balanced is supported. You must provide an existing storage pool, as this module does not create new ones."
+  type        = string
+  default     = null
+}
+
 variable "local_ssd_count" {
   description = "The number of local SSDs to attach to each VM. See https://cloud.google.com/compute/docs/disks/local-ssd."
   type        = number
@@ -75,13 +81,15 @@ variable "local_ssd_interface" {
 }
 
 variable "additional_persistent_disks" {
-  description = "Configurations of additional disks to be included on the partition nodes."
+  description = "Configurations of additional disks to be included on the partition nodes. Note that storage_pool is only supported with Hyperdisk types (balanced or throughput). You must provide an existing storage pool, as this module does not create new ones."
   type = object({
-    count = optional(number, 0)
-    type  = optional(string, "pd-balanced")
-    size  = optional(number, 200)
+    count        = optional(number, 0)
+    type         = optional(string, "pd-balanced")
+    size         = optional(number, 200)
+    storage_pool = optional(string)
   })
-  default = {}
+  default  = {}
+  nullable = false
 }
 
 variable "name_prefix" {
@@ -195,14 +203,15 @@ variable "network_interfaces" {
     subnetwork         (string, required if network is not supplied)
     subnetwork_project (string, optional)
     network_ip         (string, optional)
-    nic_type           (string, optional, choose from ["GVNIC", "VIRTIO_NET", "MRDMA", "IRDMA"])
-    stack_type         (string, optional, choose from ["IPV4_ONLY", "IPV4_IPV6"])
+    nic_type           (string, optional, choose from ["GVNIC", "VIRTIO_NET", "MRDMA", "IRDMA", "IDPF"])
+    stack_type         (string, optional, choose from ["IPV4_ONLY", "IPV4_IPV6", "IPV6_ONLY"])
     queue_count        (number, optional)
     access_config      (object, optional)
     ipv6_access_config (object, optional)
     alias_ip_range     (list(object), optional)
     EOT
   type = list(object({
+    #If both network and subnetwork are specified, the subnetwork must belong to the provided network to avoid configuration errors.
     network            = string,
     subnetwork         = string,
     subnetwork_project = string,
@@ -227,21 +236,15 @@ variable "network_interfaces" {
   default = []
   validation {
     condition = alltrue([
-      for ni in var.network_interfaces : (ni.network == null) != (ni.subnetwork == null)
+      for ni in var.network_interfaces : ni.nic_type == null || contains(["GVNIC", "VIRTIO_NET", "MRDMA", "IRDMA", "IDPF"], ni.nic_type)
     ])
-    error_message = "All additional network interfaces must define exactly one of \"network\" or \"subnetwork\"."
+    error_message = "In the variable network_interfaces, field \"nic_type\" must be \"GVNIC\", \"VIRTIO_NET\", \"MRDMA\", \"IRDMA\", \"IDPF\" or null."
   }
   validation {
     condition = alltrue([
-      for ni in var.network_interfaces : ni.nic_type == "GVNIC" || ni.nic_type == "VIRTIO_NET" || ni.nic_type == "MRDMA" || ni.nic_type == "IRDMA" || ni.nic_type == null
+      for ni in var.network_interfaces : ni.stack_type == null || contains(["IPV4_ONLY", "IPV4_IPV6", "IPV6_ONLY"], ni.stack_type)
     ])
-    error_message = "In the variable network_interfaces, field \"nic_type\" must be \"GVNIC\", \"VIRTIO_NET\", \"MRDMA\", \"IRDMA\", or null."
-  }
-  validation {
-    condition = alltrue([
-      for ni in var.network_interfaces : ni.stack_type == "IPV4_ONLY" || ni.stack_type == "IPV4_IPV6" || ni.stack_type == null
-    ])
-    error_message = "In the variable network_interfaces, field \"stack_type\" must be either \"IPV4_ONLY\", \"IPV4_IPV6\" or null."
+    error_message = "In the variable network_interfaces, field \"stack_type\" must be either \"IPV4_ONLY\", \"IPV4_IPV6\", \"IPV6_ONLY\" or null."
   }
 }
 
@@ -314,27 +317,14 @@ variable "placement_policy" {
   Control where your VM instances are physically located relative to each other within a zone.
   See https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/compute_resource_policy#nested_group_placement_policy
   EOT
-
-  type    = any # It's a workaround of lack of `optional` in Terraform 1.2
+  type = object({
+    vm_count                  = optional(number)
+    availability_domain_count = optional(number)
+    collocation               = optional(string)
+    max_distance              = optional(number)
+    gpu_topology              = optional(string)
+  })
   default = null
-  validation {
-    condition     = var.placement_policy == null ? true : try(keys(var.placement_policy), null) != null
-    error_message = <<-EOT
-    The var.placement_policy should be either unset/null or be a map/object with
-    fields: vm_count (number), availability_domain_count (number), collocation (string), max_distance (number).
-    EOT
-  }
-
-  validation {
-    condition = alltrue([
-      for k in try(keys(var.placement_policy), []) : contains([
-      "vm_count", "availability_domain_count", "collocation", "max_distance"], k)
-    ])
-    error_message = <<-EOT
-    The supported fields for var.placement_policy are:
-    vm_count (number), availability_domain_count (number), collocation (string), max_distance (number).
-    EOT
-  }
 }
 
 # tflint-ignore: terraform_unused_declarations
@@ -449,4 +439,10 @@ variable "reservation_name" {
     condition     = length(regexall("^((projects/([a-z0-9-]+)/reservations/)?([a-z0-9-]+))?$", var.reservation_name)) > 0
     error_message = "Reservation name must be either empty or in the format '[projects/PROJECT_ID/reservations/]RESERVATION_NAME', [...] is an optional part."
   }
+}
+
+variable "machine_configs" {
+  description = "Definition of GCE machine types and counts"
+  type        = any
+  default     = {}
 }

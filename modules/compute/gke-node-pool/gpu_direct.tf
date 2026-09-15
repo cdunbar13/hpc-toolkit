@@ -1,5 +1,5 @@
 /**
- * Copyright 2024 Google LLC
+ * Copyright 2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,35 +26,34 @@ locals {
     "a3-highgpu-8g" = {
       # Manifest to be installed for enabling TCPX on a3-highgpu-8g machines
       gpu_direct_manifests = [
-        "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/fee883360a660f71ba07478db95d5c1325322f77/gpudirect-tcpx/nccl-tcpx-installer.yaml",      # nccl_plugin v3.1.9 for tcpx
-        "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/fee883360a660f71ba07478db95d5c1325322f77/gpudirect-tcpx/nccl-config.yaml",              # nccl_configmap
-        "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/fee883360a660f71ba07478db95d5c1325322f77/nri_device_injector/nri-device-injector.yaml", # nri_plugin
+        "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/204a57cb807ec5f440811607cead422e3c65d987/gpudirect-tcpx/nccl-tcpx-installer.yaml",      # nccl_plugin v3.1.9 for tcpx
+        "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/204a57cb807ec5f440811607cead422e3c65d987/gpudirect-tcpx/nccl-config.yaml",              # nccl_configmap
+        "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/204a57cb807ec5f440811607cead422e3c65d987/nri_device_injector/nri-device-injector.yaml", # nri_plugin
       ]
       updated_workload_path   = replace(local.workload_path_tcpx, ".yaml", "-tcpx.yaml")
       rxdm_version            = "v2.0.12" # matching nccl-tcpx-installer version v3.1.9
       min_additional_networks = 4
       major_minor_version_acceptable_map = {
-        "1.27" = "1.27.7-gke.1121000"
-        "1.28" = "1.28.8-gke.1095000"
-        "1.29" = "1.29.3-gke.1093000"
-        "1.30" = "1.30.2-gke.1023000"
+        "1.27" = "1.27.16-gke.2874000"
+        "1.28" = "1.28.15-gke.3163000"
+        "1.29" = "1.29.15-gke.2467000"
       }
     }
     "a3-megagpu-8g" = {
       # Manifest to be installed for enabling TCPXO on a3-megagpu-8g machines
       gpu_direct_manifests = [
-        "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/39308db7574925ea3c14f9113fcf87f70a6fcc26/gpudirect-tcpxo/nccl-tcpxo-installer.yaml",    # nccl_plugin v1.0.8-1 for tcpxo
-        "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/39308db7574925ea3c14f9113fcf87f70a6fcc26/nri_device_injector/nri-device-injector.yaml", # nri_plugin
+        "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/a32cd5152c6ac430ed0651199484853baa14f2d0/gpudirect-tcpxo/nccl-tcpxo-installer.yaml",    # nccl_plugin v1.0.14 for tcpxo
+        "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/a32cd5152c6ac430ed0651199484853baa14f2d0/nri_device_injector/nri-device-injector.yaml", # nri_plugin
       ]
       updated_workload_path   = replace(local.workload_path_tcpxo, ".yaml", "-tcpxo.yaml")
-      rxdm_version            = "v1.0.14" # matching nccl-tcpxo-installer version v1.0.8-1
+      rxdm_version            = "v1.0.20" # matching nccl-tcpxo-installer version v1.0.14
       min_additional_networks = 8
       major_minor_version_acceptable_map = {
-        "1.28" = "1.28.9-gke.1250000"
-        "1.29" = "1.29.4-gke.1542000"
-        "1.30" = "1.30.4-gke.1129000"
-        "1.31" = "1.31.1-gke.2008000"
-        "1.32" = "1.32.2-gke.1489001"
+        "1.28" = "1.28.15-gke.3163000"
+        "1.29" = "1.29.15-gke.2467000"
+        "1.30" = "1.30.14-gke.1922000"
+        "1.31" = "1.31.14-gke.1243000"
+        "1.32" = "1.32.11-gke.1174000"
       }
     }
   }
@@ -66,15 +65,32 @@ locals {
   gke_version_parts = regex(local.gke_version_regex, var.gke_version)
   gke_version_major = local.gke_version_parts[0]
 
+  dranet_min_version = "1.34.1-gke.1829001"
+
   major_minor_version_acceptable_map = try(local.gpu_direct_setting[var.machine_type].major_minor_version_acceptable_map, null)
   minor_version_acceptable           = try(contains(keys(local.major_minor_version_acceptable_map), local.gke_version_major), false) ? local.major_minor_version_acceptable_map[local.gke_version_major] : "1.0.0-gke.0"
-  minor_version_acceptable_parts     = regex(local.gke_version_regex, local.minor_version_acceptable)
-  gke_gpudirect_compatible           = local.gke_version_parts[1] > local.minor_version_acceptable_parts[1] || (local.gke_version_parts[1] == local.minor_version_acceptable_parts[1] && local.gke_version_parts[2] >= local.minor_version_acceptable_parts[2])
+}
+
+module "dranet_version_compare" {
+  source          = "../../internal/semver_compare"
+  current_version = var.gke_version
+  minimum_version = local.dranet_min_version
+}
+
+module "gpu_direct_version_compare" {
+  source          = "../../internal/semver_compare"
+  current_version = var.gke_version
+  minimum_version = local.minor_version_acceptable
+}
+
+locals {
+  is_dranet_compatible     = module.dranet_version_compare.is_greater_than_or_equal
+  gke_gpudirect_compatible = module.gpu_direct_version_compare.is_greater_than_or_equal
 }
 
 check "gpu_direct_check_multi_vpc" {
   assert {
-    condition     = length(var.additional_networks) >= local.min_additional_networks
+    condition     = local.enable_dranet_actual || length(var.additional_networks) >= local.min_additional_networks
     error_message = "To achieve optimal performance for ${var.machine_type} machine, at least ${local.min_additional_networks} additional vpc is recommended. You could configure it in the blueprint through modules/network/multivpc with network_count set as ${local.min_additional_networks}"
   }
 }
